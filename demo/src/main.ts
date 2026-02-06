@@ -1,0 +1,371 @@
+import {
+  createContext,
+  ensureRunning,
+  loadBufferFromBlob,
+  play,
+  createGain,
+  createPanner,
+  createAnalyser,
+  getFrequencyDataByte,
+  createSineBuffer,
+  createNoiseBuffer,
+  createClickBuffer,
+  extractPeakPairs,
+  onFrame,
+} from "waa";
+import type { Playback, PeakPair } from "waa";
+
+// ---------------------------------------------------------------------------
+// DOM Elements
+// ---------------------------------------------------------------------------
+
+const $ = <T extends HTMLElement>(id: string) =>
+  document.getElementById(id) as T;
+
+const synthType = $<HTMLSelectElement>("synth-type");
+const synthFreq = $<HTMLInputElement>("synth-freq");
+const synthFreqVal = $("synth-freq-val");
+const synthDur = $<HTMLInputElement>("synth-dur");
+const synthDurVal = $("synth-dur-val");
+const btnGenerate = $<HTMLButtonElement>("btn-generate");
+const fileInput = $<HTMLInputElement>("file-input");
+const fileName = $("file-name");
+
+const waveformSection = $("waveform-section");
+const waveformCanvas = $<HTMLCanvasElement>("waveform-canvas");
+const waveformCursor = $("waveform-cursor");
+const timeCurrent = $("time-current");
+const timeDuration = $("time-duration");
+
+const playbackSection = $("playback-section");
+const btnPlay = $<HTMLButtonElement>("btn-play");
+const btnPause = $<HTMLButtonElement>("btn-pause");
+const btnStop = $<HTMLButtonElement>("btn-stop");
+const volumeInput = $<HTMLInputElement>("volume");
+const panInput = $<HTMLInputElement>("pan");
+const speedSelect = $<HTMLSelectElement>("speed");
+const loopCheckbox = $<HTMLInputElement>("loop");
+
+const visualizerSection = $("visualizer-section");
+const visualizerCanvas = $<HTMLCanvasElement>("visualizer-canvas");
+
+// ---------------------------------------------------------------------------
+// Audio State
+// ---------------------------------------------------------------------------
+
+let ctx: AudioContext | null = null;
+let gainNode: GainNode | null = null;
+let pannerNode: StereoPannerNode | null = null;
+let analyserNode: AnalyserNode | null = null;
+let currentBuffer: AudioBuffer | null = null;
+let currentPlayback: Playback | null = null;
+let stopFrameLoop: (() => void) | null = null;
+let peaks: PeakPair[] = [];
+
+function getCtx(): AudioContext {
+  if (!ctx) {
+    ctx = createContext();
+    gainNode = createGain(ctx, 0.8);
+    pannerNode = createPanner(ctx, 0);
+    analyserNode = createAnalyser(ctx, { fftSize: 256 });
+    // chain: gain -> panner -> analyser -> destination
+    gainNode.connect(pannerNode);
+    pannerNode.connect(analyserNode);
+    analyserNode.connect(ctx.destination);
+  }
+  return ctx;
+}
+
+// ---------------------------------------------------------------------------
+// Synth Controls UI
+// ---------------------------------------------------------------------------
+
+synthFreq.addEventListener("input", () => {
+  synthFreqVal.textContent = `${synthFreq.value} Hz`;
+});
+
+synthDur.addEventListener("input", () => {
+  synthDurVal.textContent = `${Number(synthDur.value).toFixed(1)} s`;
+});
+
+// ---------------------------------------------------------------------------
+// Generate Buffer
+// ---------------------------------------------------------------------------
+
+btnGenerate.addEventListener("click", async () => {
+  const audioCtx = getCtx();
+  await ensureRunning(audioCtx);
+
+  const freq = Number(synthFreq.value);
+  const dur = Number(synthDur.value);
+  const type = synthType.value;
+
+  let buffer: AudioBuffer;
+  switch (type) {
+    case "noise":
+      buffer = createNoiseBuffer(audioCtx, dur);
+      break;
+    case "click":
+      buffer = createClickBuffer(audioCtx, freq, dur);
+      break;
+    default:
+      buffer = createSineBuffer(audioCtx, freq, dur);
+  }
+
+  loadAudio(buffer);
+});
+
+// ---------------------------------------------------------------------------
+// File Input
+// ---------------------------------------------------------------------------
+
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files?.[0];
+  if (!file) return;
+
+  fileName.textContent = file.name;
+  const audioCtx = getCtx();
+  await ensureRunning(audioCtx);
+
+  const buffer = await loadBufferFromBlob(audioCtx, file);
+  loadAudio(buffer);
+});
+
+// ---------------------------------------------------------------------------
+// Load Audio & Draw Waveform
+// ---------------------------------------------------------------------------
+
+function loadAudio(buffer: AudioBuffer) {
+  // Stop any current playback
+  if (currentPlayback) {
+    currentPlayback.dispose();
+    currentPlayback = null;
+  }
+  if (stopFrameLoop) {
+    stopFrameLoop();
+    stopFrameLoop = null;
+  }
+
+  currentBuffer = buffer;
+
+  // Extract waveform peaks
+  peaks = extractPeakPairs(buffer, { resolution: 300 });
+  drawWaveform(peaks);
+
+  // Show sections
+  waveformSection.hidden = false;
+  playbackSection.hidden = false;
+  visualizerSection.hidden = false;
+
+  // Update duration display
+  timeDuration.textContent = formatTime(buffer.duration);
+  timeCurrent.textContent = formatTime(0);
+  waveformCursor.style.left = "0%";
+
+  // Reset play/pause buttons
+  btnPlay.hidden = false;
+  btnPause.hidden = true;
+}
+
+function drawWaveform(pairs: PeakPair[]) {
+  const canvas = waveformCanvas;
+  const rect = canvas.parentElement!.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+
+  const c = canvas.getContext("2d")!;
+  c.scale(devicePixelRatio, devicePixelRatio);
+
+  const w = rect.width;
+  const h = rect.height;
+  const mid = h / 2;
+  const barWidth = w / pairs.length;
+
+  c.clearRect(0, 0, w, h);
+
+  for (let i = 0; i < pairs.length; i++) {
+    const { min, max } = pairs[i]!;
+    const x = i * barWidth;
+
+    c.fillStyle = "rgba(99, 102, 241, 0.6)";
+    c.fillRect(x, mid - max * mid, barWidth - 0.5, (max - min) * mid);
+  }
+}
+
+// Redraw on resize
+window.addEventListener("resize", () => {
+  if (peaks.length > 0) drawWaveform(peaks);
+  resizeVisualizerCanvas();
+});
+
+// ---------------------------------------------------------------------------
+// Waveform Seek
+// ---------------------------------------------------------------------------
+
+waveformCanvas.parentElement!.addEventListener("click", (e) => {
+  if (!currentPlayback || !currentBuffer) return;
+  const rect = waveformCanvas.parentElement!.getBoundingClientRect();
+  const ratio = (e.clientX - rect.left) / rect.width;
+  const position = ratio * currentBuffer.duration;
+  currentPlayback.seek(position);
+});
+
+// ---------------------------------------------------------------------------
+// Playback Controls
+// ---------------------------------------------------------------------------
+
+btnPlay.addEventListener("click", async () => {
+  const audioCtx = getCtx();
+  await ensureRunning(audioCtx);
+
+  if (!currentBuffer) return;
+
+  if (currentPlayback && currentPlayback.getState() === "paused") {
+    currentPlayback.resume();
+  } else {
+    // Start new playback
+    if (currentPlayback) {
+      currentPlayback.dispose();
+    }
+    if (stopFrameLoop) {
+      stopFrameLoop();
+    }
+
+    currentPlayback = play(audioCtx, currentBuffer, {
+      through: [gainNode!],
+      loop: loopCheckbox.checked,
+      playbackRate: Number(speedSelect.value),
+    });
+
+    // Frame loop for visualizer + cursor updates
+    stopFrameLoop = onFrame(currentPlayback, (snapshot) => {
+      // Update cursor
+      waveformCursor.style.left = `${snapshot.progress * 100}%`;
+      timeCurrent.textContent = formatTime(snapshot.position);
+
+      // Draw frequency visualizer
+      if (analyserNode) drawVisualizer();
+
+      // Sync button state
+      if (snapshot.state === "playing") {
+        btnPlay.hidden = true;
+        btnPause.hidden = false;
+      } else {
+        btnPlay.hidden = false;
+        btnPause.hidden = true;
+      }
+    });
+
+    currentPlayback.on("ended", () => {
+      btnPlay.hidden = false;
+      btnPause.hidden = true;
+      waveformCursor.style.left = "0%";
+      timeCurrent.textContent = formatTime(0);
+    });
+  }
+
+  btnPlay.hidden = true;
+  btnPause.hidden = false;
+});
+
+btnPause.addEventListener("click", () => {
+  if (currentPlayback) {
+    currentPlayback.pause();
+    btnPlay.hidden = false;
+    btnPause.hidden = true;
+  }
+});
+
+btnStop.addEventListener("click", () => {
+  if (currentPlayback) {
+    currentPlayback.stop();
+    btnPlay.hidden = false;
+    btnPause.hidden = true;
+    waveformCursor.style.left = "0%";
+    timeCurrent.textContent = formatTime(0);
+  }
+});
+
+// Volume
+volumeInput.addEventListener("input", () => {
+  if (gainNode) {
+    gainNode.gain.value = Number(volumeInput.value);
+  }
+});
+
+// Pan
+panInput.addEventListener("input", () => {
+  if (pannerNode) {
+    pannerNode.pan.value = Number(panInput.value);
+  }
+});
+
+// Speed
+speedSelect.addEventListener("change", () => {
+  if (currentPlayback) {
+    currentPlayback.setPlaybackRate(Number(speedSelect.value));
+  }
+});
+
+// Loop
+loopCheckbox.addEventListener("change", () => {
+  if (currentPlayback) {
+    currentPlayback.setLoop(loopCheckbox.checked);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Frequency Visualizer
+// ---------------------------------------------------------------------------
+
+function resizeVisualizerCanvas() {
+  const rect = visualizerCanvas.parentElement!.getBoundingClientRect();
+  visualizerCanvas.width = rect.width * devicePixelRatio;
+  visualizerCanvas.height = 120 * devicePixelRatio;
+}
+
+function drawVisualizer() {
+  if (!analyserNode) return;
+
+  const canvas = visualizerCanvas;
+  const c = canvas.getContext("2d")!;
+
+  const rect = canvas.parentElement!.getBoundingClientRect();
+  const w = rect.width;
+  const h = 120;
+
+  // Ensure canvas is sized
+  if (canvas.width !== w * devicePixelRatio) {
+    canvas.width = w * devicePixelRatio;
+    canvas.height = h * devicePixelRatio;
+  }
+  c.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+
+  const data = getFrequencyDataByte(analyserNode);
+  const barCount = data.length;
+  const barWidth = w / barCount;
+
+  c.clearRect(0, 0, w, h);
+
+  for (let i = 0; i < barCount; i++) {
+    const value = data[i]! / 255;
+    const barHeight = value * h;
+
+    const hue = 240 + value * 60; // blue to purple gradient
+    c.fillStyle = `hsla(${hue}, 70%, 60%, 0.8)`;
+    c.fillRect(i * barWidth, h - barHeight, barWidth - 1, barHeight);
+  }
+}
+
+// Initial canvas resize
+resizeVisualizerCanvas();
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs < 10 ? "0" : ""}${secs.toFixed(1)}`;
+}

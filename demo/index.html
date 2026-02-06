@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>waa - Web Audio API Demo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>waa</h1>
+        <p class="subtitle">Composable Web Audio API utilities</p>
+      </header>
+
+      <main>
+        <!-- Sound Source Section -->
+        <section class="card">
+          <h2>Sound Source</h2>
+          <p class="description">Generate a synthesized tone or load an audio file to get started.</p>
+          <div class="source-controls">
+            <div class="synth-controls">
+              <label>
+                Type
+                <select id="synth-type">
+                  <option value="sine">Sine Wave</option>
+                  <option value="noise">White Noise</option>
+                  <option value="click">Click / Impulse</option>
+                </select>
+              </label>
+              <label>
+                Frequency
+                <input type="range" id="synth-freq" min="50" max="2000" value="440" />
+                <span id="synth-freq-val">440 Hz</span>
+              </label>
+              <label>
+                Duration
+                <input type="range" id="synth-dur" min="0.5" max="5" step="0.5" value="2" />
+                <span id="synth-dur-val">2.0 s</span>
+              </label>
+              <button id="btn-generate" class="btn btn-primary">Generate</button>
+            </div>
+            <div class="divider">or</div>
+            <div class="file-controls">
+              <label class="btn btn-secondary file-label">
+                Load Audio File
+                <input type="file" id="file-input" accept="audio/*" hidden />
+              </label>
+              <span id="file-name" class="file-name"></span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Waveform Section -->
+        <section class="card" id="waveform-section" hidden>
+          <h2>Waveform</h2>
+          <div class="waveform-container">
+            <canvas id="waveform-canvas"></canvas>
+            <div id="waveform-cursor" class="waveform-cursor"></div>
+          </div>
+          <div id="time-display" class="time-display">
+            <span id="time-current">0:00.0</span>
+            <span id="time-duration">0:00.0</span>
+          </div>
+        </section>
+
+        <!-- Playback Controls -->
+        <section class="card" id="playback-section" hidden>
+          <h2>Playback</h2>
+          <div class="playback-controls">
+            <button id="btn-play" class="btn btn-icon" title="Play">
+              <svg viewBox="0 0 24 24" width="24" height="24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+            </button>
+            <button id="btn-pause" class="btn btn-icon" title="Pause" hidden>
+              <svg viewBox="0 0 24 24" width="24" height="24"><rect x="5" y="3" width="4" height="18" fill="currentColor"/><rect x="15" y="3" width="4" height="18" fill="currentColor"/></svg>
+            </button>
+            <button id="btn-stop" class="btn btn-icon" title="Stop">
+              <svg viewBox="0 0 24 24" width="24" height="24"><rect x="4" y="4" width="16" height="16" fill="currentColor"/></svg>
+            </button>
+            <label class="control-label">
+              Volume
+              <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8" />
+            </label>
+            <label class="control-label">
+              Pan
+              <input type="range" id="pan" min="-1" max="1" step="0.01" value="0" />
+            </label>
+            <label class="control-label">
+              Speed
+              <select id="speed">
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2x</option>
+              </select>
+            </label>
+            <label class="control-label">
+              <input type="checkbox" id="loop" />
+              Loop
+            </label>
+          </div>
+        </section>
+
+        <!-- Frequency Visualizer -->
+        <section class="card" id="visualizer-section" hidden>
+          <h2>Frequency Visualizer</h2>
+          <canvas id="visualizer-canvas"></canvas>
+        </section>
+
+        <!-- API Examples -->
+        <section class="card">
+          <h2>Code Example</h2>
+          <pre><code id="code-example">import {
+  createContext,
+  createSineBuffer,
+  play,
+  createGain,
+  createPanner,
+  createAnalyser,
+  extractPeaks,
+} from "waa";
+
+// Create AudioContext &amp; synthesize a tone
+const ctx = createContext();
+const buffer = createSineBuffer(ctx, 440, 2);
+
+// Build audio graph: source -> gain -> panner -> destination
+const gain = createGain(ctx, 0.8);
+const panner = createPanner(ctx, 0);
+
+// Start playback
+const playback = play(ctx, buffer, {
+  through: [gain, panner],
+  loop: true,
+});
+
+// Extract waveform data for visualization
+const peaks = extractPeaks(buffer, { resolution: 300 });
+
+// Subscribe to time updates
+playback.on("timeupdate", ({ position, duration }) =&gt; {
+  console.log(`${position.toFixed(1)}s / ${duration.toFixed(1)}s`);
+});
+
+// Controls
+playback.pause();
+playback.resume();
+playback.seek(1.0);
+playback.setPlaybackRate(1.5);
+playback.stop();</code></pre>
+        </section>
+      </main>
+
+      <footer>
+        <p>
+          <a href="https://github.com/ivgtr/waa" target="_blank" rel="noopener">GitHub</a>
+          &middot; Zero dependencies &middot; Framework-agnostic &middot; Sample-accurate
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
