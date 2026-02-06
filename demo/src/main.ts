@@ -29,6 +29,8 @@ const synthDur = $<HTMLInputElement>("synth-dur");
 const synthDurVal = $("synth-dur-val");
 const btnGenerate = $<HTMLButtonElement>("btn-generate");
 const fileInput = $<HTMLInputElement>("file-input");
+const fileLabel = $("file-label");
+const fileLabelText = $("file-label-text");
 const fileName = $("file-name");
 
 const waveformSection = $("waveform-section");
@@ -38,9 +40,10 @@ const timeCurrent = $("time-current");
 const timeDuration = $("time-duration");
 
 const playbackSection = $("playback-section");
-const btnPlay = $<HTMLButtonElement>("btn-play");
-const btnPause = $<HTMLButtonElement>("btn-pause");
+const btnPlayPause = $<HTMLButtonElement>("btn-play-pause");
 const btnStop = $<HTMLButtonElement>("btn-stop");
+const iconPlay = btnPlayPause.querySelector(".icon-play") as SVGElement;
+const iconPause = btnPlayPause.querySelector(".icon-pause") as SVGElement;
 const volumeInput = $<HTMLInputElement>("volume");
 const panInput = $<HTMLInputElement>("pan");
 const speedSelect = $<HTMLSelectElement>("speed");
@@ -74,6 +77,28 @@ function getCtx(): AudioContext {
     analyserNode.connect(ctx.destination);
   }
   return ctx;
+}
+
+// ---------------------------------------------------------------------------
+// Transport State Helpers
+// ---------------------------------------------------------------------------
+
+type TransportState = "stopped" | "playing" | "paused";
+
+function setTransportState(state: TransportState) {
+  btnPlayPause.dataset.state = state;
+
+  if (state === "playing") {
+    iconPlay.setAttribute("hidden", "");
+    iconPause.removeAttribute("hidden");
+    btnPlayPause.title = "Pause";
+    btnStop.disabled = false;
+  } else {
+    iconPause.setAttribute("hidden", "");
+    iconPlay.removeAttribute("hidden");
+    btnPlayPause.title = "Play";
+    btnStop.disabled = state === "stopped";
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -116,19 +141,33 @@ btnGenerate.addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// File Input
+// File Input (with loading state)
 // ---------------------------------------------------------------------------
 
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
   if (!file) return;
 
-  fileName.textContent = file.name;
-  const audioCtx = getCtx();
-  await ensureRunning(audioCtx);
+  // Show loading state
+  fileLabel.classList.add("is-loading");
+  fileLabelText.textContent = "Loading...";
+  fileName.innerHTML = '<span class="spinner"></span>';
 
-  const buffer = await loadBufferFromBlob(audioCtx, file);
-  loadAudio(buffer);
+  try {
+    const audioCtx = getCtx();
+    await ensureRunning(audioCtx);
+
+    const buffer = await loadBufferFromBlob(audioCtx, file);
+
+    // Restore label and show file name
+    fileName.textContent = file.name;
+    loadAudio(buffer);
+  } catch {
+    fileName.textContent = "Failed to load file";
+  } finally {
+    fileLabel.classList.remove("is-loading");
+    fileLabelText.textContent = "Load Audio File";
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -162,9 +201,8 @@ function loadAudio(buffer: AudioBuffer) {
   timeCurrent.textContent = formatTime(0);
   waveformCursor.style.left = "0%";
 
-  // Reset play/pause buttons
-  btnPlay.hidden = false;
-  btnPause.hidden = true;
+  // Reset transport state
+  setTransportState("stopped");
 }
 
 function drawWaveform(pairs: PeakPair[]) {
@@ -214,73 +252,70 @@ waveformCanvas.parentElement!.addEventListener("click", (e) => {
 // Playback Controls
 // ---------------------------------------------------------------------------
 
-btnPlay.addEventListener("click", async () => {
+btnPlayPause.addEventListener("click", async () => {
   const audioCtx = getCtx();
   await ensureRunning(audioCtx);
 
   if (!currentBuffer) return;
 
+  // If playing -> pause
+  if (currentPlayback && currentPlayback.getState() === "playing") {
+    currentPlayback.pause();
+    setTransportState("paused");
+    return;
+  }
+
+  // If paused -> resume
   if (currentPlayback && currentPlayback.getState() === "paused") {
     currentPlayback.resume();
-  } else {
-    // Start new playback
-    if (currentPlayback) {
-      currentPlayback.dispose();
-    }
-    if (stopFrameLoop) {
-      stopFrameLoop();
-    }
-
-    currentPlayback = play(audioCtx, currentBuffer, {
-      through: [gainNode!],
-      loop: loopCheckbox.checked,
-      playbackRate: Number(speedSelect.value),
-    });
-
-    // Frame loop for visualizer + cursor updates
-    stopFrameLoop = onFrame(currentPlayback, (snapshot) => {
-      // Update cursor
-      waveformCursor.style.left = `${snapshot.progress * 100}%`;
-      timeCurrent.textContent = formatTime(snapshot.position);
-
-      // Draw frequency visualizer
-      if (analyserNode) drawVisualizer();
-
-      // Sync button state
-      if (snapshot.state === "playing") {
-        btnPlay.hidden = true;
-        btnPause.hidden = false;
-      } else {
-        btnPlay.hidden = false;
-        btnPause.hidden = true;
-      }
-    });
-
-    currentPlayback.on("ended", () => {
-      btnPlay.hidden = false;
-      btnPause.hidden = true;
-      waveformCursor.style.left = "0%";
-      timeCurrent.textContent = formatTime(0);
-    });
+    setTransportState("playing");
+    return;
   }
 
-  btnPlay.hidden = true;
-  btnPause.hidden = false;
-});
-
-btnPause.addEventListener("click", () => {
+  // Start new playback
   if (currentPlayback) {
-    currentPlayback.pause();
-    btnPlay.hidden = false;
-    btnPause.hidden = true;
+    currentPlayback.dispose();
   }
+  if (stopFrameLoop) {
+    stopFrameLoop();
+  }
+
+  currentPlayback = play(audioCtx, currentBuffer, {
+    through: [gainNode!],
+    loop: loopCheckbox.checked,
+    playbackRate: Number(speedSelect.value),
+  });
+
+  setTransportState("playing");
+
+  // Frame loop for visualizer + cursor updates
+  stopFrameLoop = onFrame(currentPlayback, (snapshot) => {
+    // Update cursor
+    waveformCursor.style.left = `${snapshot.progress * 100}%`;
+    timeCurrent.textContent = formatTime(snapshot.position);
+
+    // Draw frequency visualizer
+    if (analyserNode) drawVisualizer();
+
+    // Sync transport state from playback
+    if (snapshot.state === "playing") {
+      setTransportState("playing");
+    } else if (snapshot.state === "paused") {
+      setTransportState("paused");
+    }
+  });
+
+  currentPlayback.on("ended", () => {
+    setTransportState("stopped");
+    waveformCursor.style.left = "0%";
+    timeCurrent.textContent = formatTime(0);
+  });
 });
 
 btnStop.addEventListener("click", () => {
   if (currentPlayback) {
     currentPlayback.stop();
-    btnPlay.hidden = false;
-    btnPause.hidden = true;
+    setTransportState("stopped");
     waveformCursor.style.left = "0%";
     timeCurrent.textContent = formatTime(0);
   }
