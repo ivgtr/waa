@@ -1,0 +1,110 @@
+{
+  "name": "waa",
+  "version": "0.0.0",
+  "description": "Composable Web Audio API utilities. BYO AudioContext. Framework-agnostic. Sample-accurate.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./context": {
+      "import": {
+        "types": "./dist/context.d.ts",
+        "default": "./dist/context.js"
+      }
+    },
+    "./buffer": {
+      "import": {
+        "types": "./dist/buffer.d.ts",
+        "default": "./dist/buffer.js"
+      }
+    },
+    "./play": {
+      "import": {
+        "types": "./dist/play.d.ts",
+        "default": "./dist/play.js"
+      }
+    },
+    "./emitter": {
+      "import": {
+        "types": "./dist/emitter.d.ts",
+        "default": "./dist/emitter.js"
+      }
+    },
+    "./nodes": {
+      "import": {
+        "types": "./dist/nodes.d.ts",
+        "default": "./dist/nodes.js"
+      }
+    },
+    "./waveform": {
+      "import": {
+        "types": "./dist/waveform.d.ts",
+        "default": "./dist/waveform.js"
+      }
+    },
+    "./fade": {
+      "import": {
+        "types": "./dist/fade.d.ts",
+        "default": "./dist/fade.js"
+      }
+    },
+    "./scheduler": {
+      "import": {
+        "types": "./dist/scheduler.d.ts",
+        "default": "./dist/scheduler.js"
+      }
+    },
+    "./synth": {
+      "import": {
+        "types": "./dist/synth.d.ts",
+        "default": "./dist/synth.js"
+      }
+    },
+    "./adapters": {
+      "import": {
+        "types": "./dist/adapters.d.ts",
+        "default": "./dist/adapters.js"
+      }
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "web-audio",
+    "audio",
+    "sound",
+    "webaudio",
+    "audiocontext",
+    "composable",
+    "tree-shakeable"
+  ],
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}
