@@ -70,7 +70,8 @@ header h1 {
   margin-bottom: 1rem;
 }
 
-/* Buttons */
+/* ── Buttons ─────────────────────────────────────────────────── */
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -84,20 +85,28 @@ header h1 {
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  height: 36px;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
   border-color: var(--accent);
   background: var(--accent-dim);
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+  font-weight: 500;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }
@@ -107,9 +116,11 @@ header h1 {
   height: 40px;
   padding: 0;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
-/* Source Controls */
+/* ── Source Controls ─────────────────────────────────────────── */
+
 .source-controls {
   display: flex;
   flex-direction: column;
@@ -118,12 +129,18 @@ header h1 {
 
 .synth-controls {
   display: flex;
-  flex-wrap: wrap;
+  align-items: flex-end;
   gap: 0.75rem;
-  align-items: end;
 }
 
-.synth-controls label {
+.synth-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.synth-label {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -131,9 +148,31 @@ header h1 {
   color: var(--text-muted);
 }
 
-.synth-controls select,
-.synth-controls input[type="range"] {
+.synth-label .label-text {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.synth-label select,
+.synth-label input[type="range"] {
   width: 120px;
+}
+
+.synth-label select {
+  height: 28px;
+}
+
+.range-value {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#btn-generate {
+  align-self: flex-end;
+  height: 36px;
 }
 
 .divider {
@@ -167,12 +206,42 @@ header h1 {
   gap: 0.75rem;
 }
 
+.file-label {
+  gap: 0.4rem;
+}
+
+.file-label.is-loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.file-icon {
+  flex-shrink: 0;
+}
+
 .file-name {
   color: var(--text-muted);
   font-size: 0.8rem;
 }
 
-/* Waveform */
+/* Loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── Waveform ────────────────────────────────────────────────── */
+
 .waveform-container {
   position: relative;
   height: 100px;
@@ -208,8 +277,45 @@ header h1 {
   font-variant-numeric: tabular-nums;
 }
 
-/* Playback Controls */
+/* ── Playback Controls ───────────────────────────────────────── */
+
 .playback-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.transport-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-transport {
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.btn-transport[data-state="playing"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-transport[data-state="playing"]:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn-transport[data-state="paused"] {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.control-params {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -241,7 +347,13 @@ header h1 {
   accent-color: var(--accent);
 }
 
-/* Visualizer */
+.control-label-checkbox {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ── Visualizer ──────────────────────────────────────────────── */
+
 #visualizer-canvas {
   width: 100%;
   height: 120px;
@@ -250,7 +362,8 @@ header h1 {
   border-radius: var(--radius);
 }
 
-/* Inputs */
+/* ── Inputs ──────────────────────────────────────────────────── */
+
 input[type="range"] {
   accent-color: var(--accent);
 }
@@ -264,7 +377,8 @@ select {
   font-size: 0.8rem;
 }
 
-/* Code */
+/* ── Code ────────────────────────────────────────────────────── */
+
 pre {
   background: var(--bg);
   border-radius: var(--radius);
@@ -279,7 +393,8 @@ code {
   color: var(--text-muted);
 }
 
-/* Footer */
+/* ── Footer ──────────────────────────────────────────────────── */
+
 footer {
   text-align: center;
   margin-top: 2rem;
@@ -296,7 +411,8 @@ footer a:hover {
   text-decoration: underline;
 }
 
-/* Responsive */
+/* ── Responsive ──────────────────────────────────────────────── */
+
 @media (max-width: 600px) {
   .container {
     padding: 1rem 0.75rem;
@@ -304,6 +420,15 @@ footer a:hover {
 
   header h1 {
     font-size: 2rem;
+  }
+
+  .synth-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #btn-generate {
+    align-self: stretch;
   }
 
   .playback-controls {
