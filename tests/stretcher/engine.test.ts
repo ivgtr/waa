@@ -52,6 +52,7 @@ describe("createStretcherEngine", () => {
           value: 1,
           setValueAtTime: vi.fn(),
           linearRampToValueAtTime: vi.fn(),
+          setValueCurveAtTime: vi.fn(),
         },
         connect: vi.fn(),
         disconnect: vi.fn(),

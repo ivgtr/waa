@@ -71,6 +71,7 @@ function createMockAudioContext() {
         value: 1,
         setValueAtTime: vi.fn(),
         linearRampToValueAtTime: vi.fn(),
+        setValueCurveAtTime: vi.fn(),
       },
       connect: vi.fn(),
       disconnect: vi.fn(),
@@ -166,27 +167,27 @@ describe("playback lifecycle (chunk progression)", () => {
     vi.useRealTimers();
   });
 
-  // 15s audio, sampleRate=44100 → 3 chunks (CHUNK_DURATION_SEC=5)
-  // Chunk 0: inputStart=0, inputEnd=229320, overlap=(0,8820)  → nominal 0–220500
-  // Chunk 1: inputStart=211680, inputEnd=449820, overlap=(8820,8820) → nominal 220500–441000
-  // Chunk 2: inputStart=432180, inputEnd=661500, overlap=(8820,0)  → nominal 441000–661500
+  // 24s audio, sampleRate=44100 → 3 chunks (CHUNK_DURATION_SEC=8)
+  // Chunk 0: inputStart=0, inputEnd=361620, overlap=(0,8820)  → nominal 0–352800
+  // Chunk 1: inputStart=343980, inputEnd=714420, overlap=(8820,8820) → nominal 352800–705600
+  // Chunk 2: inputStart=696780, inputEnd=1058400, overlap=(8820,0)  → nominal 705600–1058400
 
   // Worker が返す raw WSOLA 出力（trim 前）= 入力長（tempo=1.0）
-  const CHUNK0_RAW = 229320;  // nominal 5s + overlapAfter 0.2s
-  const CHUNK1_RAW = 238140;  // nominal 5s + overlap 0.2s × 2
-  const CHUNK2_RAW = 229320;  // nominal 5s + overlapBefore 0.2s
+  const CHUNK0_RAW = 361620;  // nominal 8s + overlapAfter 0.2s
+  const CHUNK1_RAW = 370440;  // nominal 8s + overlap 0.2s × 2
+  const CHUNK2_RAW = 361620;  // nominal 8s + overlapBefore 0.2s
 
   // engine 内で trim 後に createBuffer に渡される長さ
-  // Chunk 0: overlapBefore=0 → keepBefore=0, trimStart=0, trimEnd=8820 → 229320-0-8820=220500
-  // Chunk 1: overlapBefore>0 → keepBefore=min(4410,8820)=4410, trimStart=8820-4410=4410, trimEnd=8820 → 238140-4410-8820=224910
-  // Chunk 2: overlapBefore>0 → keepBefore=min(4410,8820)=4410, trimStart=8820-4410=4410, trimEnd=0 → 229320-4410-0=224910
-  const CHUNK0_TRIMMED = 220500;
-  const CHUNK1_TRIMMED = 224910;
-  const CHUNK2_TRIMMED = 224910;
+  // Chunk 0: overlapBefore=0 → keepBefore=0, trimStart=0, trimEnd=8820 → 361620-0-8820=352800
+  // Chunk 1: overlapBefore>0 → keepBefore=min(4410,8820)=4410, trimStart=4410, trimEnd=8820 → 370440-4410-8820=357210
+  // Chunk 2: overlapBefore>0 → keepBefore=min(4410,8820)=4410, trimStart=4410, trimEnd=0 → 361620-4410-0=357210
+  const CHUNK0_TRIMMED = 352800;
+  const CHUNK1_TRIMMED = 357210;
+  const CHUNK2_TRIMMED = 357210;
 
   it("直接パス: chunk 0 → onended → chunk 1 へ正常に進む", () => {
     const ctx = createMockAudioContext();
-    const buffer = createMockAudioBuffer(15);
+    const buffer = createMockAudioBuffer(24);
     const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
 
     engine.start();
@@ -222,7 +223,7 @@ describe("playback lifecycle (chunk progression)", () => {
 
   it("scheduleNext パス: lookahead → scheduleNext(chunk 1) → transition 後に chunk 2 へ進む", () => {
     const ctx = createMockAudioContext();
-    const buffer = createMockAudioBuffer(15);
+    const buffer = createMockAudioBuffer(24);
     const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
 
     engine.start();
@@ -239,8 +240,8 @@ describe("playback lifecycle (chunk progression)", () => {
     const callsBefore = createBufferMock.mock.calls.length;
 
     // --- Lookahead トリガー ---
-    // chunk 0 の再生 duration ≈ 5.0s, remaining <= 0.5s で onNeedNext 発火
-    (ctx as any).currentTime = 4.6;
+    // chunk 0 の再生 duration ≈ 8.0s, remaining <= 0.5s で onNeedNext 発火
+    (ctx as any).currentTime = 7.6;
     vi.advanceTimersByTime(200); // LOOKAHEAD_INTERVAL_MS
 
     // scheduleNext で chunk 1 の AudioBuffer が作られるはず
@@ -253,7 +254,7 @@ describe("playback lifecycle (chunk progression)", () => {
 
     // --- Transition setTimeout 発火 ---
     // scheduleNext 内 transitionDelay = 0.3 * 1000 + 50 = 350ms
-    (ctx as any).currentTime = 5.0;
+    (ctx as any).currentTime = 8.0;
     vi.advanceTimersByTime(400);
 
     // Transition 後: chunk 0 source は stopped (onended=null), chunk 1 source が current
@@ -276,7 +277,7 @@ describe("playback lifecycle (chunk progression)", () => {
 
   it("scheduleNext パスで currentChunkIndex が正しく更新される", () => {
     const ctx = createMockAudioContext();
-    const buffer = createMockAudioBuffer(15);
+    const buffer = createMockAudioBuffer(24);
     const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
 
     engine.start();
@@ -288,25 +289,25 @@ describe("playback lifecycle (chunk progression)", () => {
     expect(engine.getStatus().phase).toBe("playing");
 
     // Lookahead → scheduleNext(chunk 1)
-    (ctx as any).currentTime = 4.6;
+    (ctx as any).currentTime = 7.6;
     vi.advanceTimersByTime(200);
 
     // Transition
-    (ctx as any).currentTime = 5.0;
+    (ctx as any).currentTime = 8.0;
     vi.advanceTimersByTime(400);
 
     // Chunk 1 ended
     const active = findActiveSource();
     active!.onended!();
 
-    // Position は chunk 2 の先頭 (≈10 sec) であるべき
-    // バグがあると chunk 1 の先頭 (≈5 sec) を指す
-    (ctx as any).currentTime = 5.1; // 少し進める
+    // Position は chunk 2 の先頭 (≈16 sec) であるべき
+    // バグがあると chunk 1 の先頭 (≈8 sec) を指す
+    (ctx as any).currentTime = 8.1; // 少し進める
     const pos = engine.getCurrentPosition();
 
-    // chunk 2 の nominal start = 441000 / 44100 = 10.0 sec
-    // chunk 1 の nominal start = 220500 / 44100 = 5.0 sec
-    expect(pos).toBeGreaterThanOrEqual(9.5);
+    // chunk 2 の nominal start = 705600 / 44100 = 16.0 sec
+    // chunk 1 の nominal start = 352800 / 44100 = 8.0 sec
+    expect(pos).toBeGreaterThanOrEqual(15.5);
 
     engine.dispose();
   });

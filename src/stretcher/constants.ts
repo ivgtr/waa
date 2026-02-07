@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 // Chunk splitting
-export const CHUNK_DURATION_SEC = 5;
+export const CHUNK_DURATION_SEC = 8;
 export const OVERLAP_SEC = 0.2;
 export const CROSSFADE_SEC = 0.1;
 
@@ -24,9 +24,9 @@ export const BUFFER_CRITICAL_SEC = 3;
 export const BUFFER_RESUME_SEC = 5;
 
 // Memory management
-export const KEEP_AHEAD_CHUNKS = 30;
+export const KEEP_AHEAD_CHUNKS = 19;
 export const KEEP_AHEAD_SECONDS = 150;
-export const KEEP_BEHIND_CHUNKS = 12;
+export const KEEP_BEHIND_CHUNKS = 8;
 export const KEEP_BEHIND_SECONDS = 60;
 
 // Worker pool
