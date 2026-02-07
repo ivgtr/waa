@@ -30,8 +30,10 @@ export function createChunkPlayer(
   let stopped = true;
 
   let lookaheadTimer: ReturnType<typeof setInterval> | null = null;
+  let transitionTimerId: ReturnType<typeof setTimeout> | null = null;
   let onChunkEnded: (() => void) | null = null;
   let onNeedNext: (() => void) | null = null;
+  let onTransition: (() => void) | null = null;
   let disposed = false;
 
   function connectToDestination(node: AudioNode): void {
@@ -112,6 +114,13 @@ export function createChunkPlayer(
     }
   }
 
+  function cancelTransition(): void {
+    if (transitionTimerId !== null) {
+      clearTimeout(transitionTimerId);
+      transitionTimerId = null;
+    }
+  }
+
   function getElapsedInChunk(): number {
     if (paused) return pausedPosition;
     if (stopped) return 0;
@@ -123,6 +132,7 @@ export function createChunkPlayer(
     _startTime: number,
     offsetInChunk: number = 0,
   ): void {
+    cancelTransition();
     stopCurrentSource();
     stopNextSource();
 
@@ -184,7 +194,9 @@ export function createChunkPlayer(
       0,
       (startTime - ctx.currentTime) * 1000 + 50,
     );
-    setTimeout(() => {
+    cancelTransition();
+    transitionTimerId = setTimeout(() => {
+      transitionTimerId = null;
       if (disposed) return;
       stopCurrentSource();
       currentSource = nextSource;
@@ -195,6 +207,8 @@ export function createChunkPlayer(
       currentChunkDuration = buffer.duration;
       playStartOffset = 0;
       playStartCtxTime = startTime;
+
+      onTransition?.();
     }, transitionDelay);
   }
 
@@ -206,6 +220,7 @@ export function createChunkPlayer(
     if (paused || stopped || disposed) return;
     pausedPosition = getElapsedInChunk();
     paused = true;
+    cancelTransition();
     stopCurrentSource();
     stopNextSource();
     stopLookahead();
@@ -222,6 +237,7 @@ export function createChunkPlayer(
     stopped = true;
     paused = false;
     pausedPosition = 0;
+    cancelTransition();
     stopCurrentSource();
     stopNextSource();
     stopLookahead();
@@ -245,9 +261,13 @@ export function createChunkPlayer(
     setOnNeedNext(callback: () => void): void {
       onNeedNext = callback;
     },
+    setOnTransition(callback: () => void): void {
+      onTransition = callback;
+    },
     dispose(): void {
       if (disposed) return;
       disposed = true;
+      cancelTransition();
       stopCurrentSource();
       stopNextSource();
       stopLookahead();

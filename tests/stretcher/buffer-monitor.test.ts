@@ -99,10 +99,17 @@ describe("createBufferMonitor", () => {
       expect(monitor.shouldExitBuffering(0, chunks)).toBe(true);
     });
 
-    it("exits when next chunk becomes ready", () => {
+    it("exits when current and next chunk become ready", () => {
       const chunks = makeChunks(5, 0);
+      chunks[0]!.state = "ready";
       chunks[1]!.state = "ready";
       expect(monitor.shouldExitBuffering(0, chunks)).toBe(true);
+    });
+
+    it("does not exit when only next chunk is ready but current is pending", () => {
+      const chunks = makeChunks(5, 0);
+      chunks[1]!.state = "ready";
+      expect(monitor.shouldExitBuffering(0, chunks)).toBe(false);
     });
 
     it("exits when all chunks are ready", () => {

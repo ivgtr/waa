@@ -269,6 +269,7 @@ export interface ChunkPlayer {
   getCurrentPosition(): number;
   setOnChunkEnded(callback: () => void): void;
   setOnNeedNext(callback: () => void): void;
+  setOnTransition(callback: () => void): void;
   dispose(): void;
 }
 

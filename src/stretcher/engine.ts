@@ -140,6 +140,17 @@ export function createStretcherEngine(
     }
   });
 
+  chunkPlayer.setOnTransition(() => {
+    if (disposed) return;
+    // scheduleNext の transition 完了: chunk N+1 が current に昇格した
+    const nextIdx = currentChunkIndex + 1;
+    if (nextIdx < chunks.length) {
+      currentChunkIndex = nextIdx;
+      scheduler.updatePriorities(currentChunkIndex);
+      evictDistantChunks();
+    }
+  });
+
   // --- Callbacks ---
 
   function onChunkReady(chunkIndex: number): void {
@@ -252,17 +263,27 @@ export function createStretcherEngine(
     emitter.emit("buffered", { stallDuration });
 
     if (bufferingResumePosition !== null) {
+      const resumePos = bufferingResumePosition;
+      bufferingResumePosition = null;
+
       const chunk = chunks[currentChunkIndex];
-      if (chunk) {
+      if (chunk && chunk.state === "ready" && chunk.outputBuffer) {
         const nominalStartSample = chunk.inputStartSample + chunk.overlapBefore;
         const nominalStartSec = nominalStartSample / sampleRate;
-        const offsetInOriginal = bufferingResumePosition - nominalStartSec;
+        const offsetInOriginal = resumePos - nominalStartSec;
         const offsetInOutput = Math.max(0, offsetInOriginal / currentTempo);
+        const outputDurationSec = chunk.outputLength / sampleRate;
+
+        const MIN_PLAYABLE_SEC = 0.05;
+        if (outputDurationSec > 0 && offsetInOutput >= outputDurationSec - MIN_PLAYABLE_SEC) {
+          advanceToNextChunk();
+          return;
+        }
+
         playCurrentChunk(offsetInOutput);
       } else {
         playCurrentChunk();
       }
-      bufferingResumePosition = null;
     } else {
       playCurrentChunk();
     }
@@ -434,7 +455,8 @@ export function createStretcherEngine(
         phase = "playing";
         const audioBuf = createAudioBufferFromChunk(chunk);
         if (audioBuf) {
-          chunkPlayer.handleSeek(audioBuf, Math.max(0, offsetInOutput));
+          const clampedOffset = Math.min(Math.max(0, offsetInOutput), audioBuf.duration - 0.001);
+          chunkPlayer.handleSeek(audioBuf, clampedOffset);
         }
       }
     } else {
@@ -450,10 +472,12 @@ export function createStretcherEngine(
   }
 
   function setTempo(newTempo: number): void {
-    if (disposed || newTempo === currentTempo) return;
+    if (disposed || phase === "ended" || newTempo === currentTempo) return;
     bufferingResumePosition = getPositionInOriginalBuffer();
+    currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition, sampleRate);
     currentTempo = newTempo;
     enterBuffering("tempo-change");
+    scheduler.updatePriorities(currentChunkIndex);
     scheduler.handleTempoChange(newTempo);
   }
 

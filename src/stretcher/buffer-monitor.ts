@@ -70,6 +70,10 @@ export function createBufferMonitor(
     currentChunkIndex: number,
     chunks: ChunkInfo[],
   ): boolean {
+    // カレントチャンクが ready でなければ buffering を抜けない
+    const currentChunk = chunks[currentChunkIndex];
+    if (!currentChunk || currentChunk.state !== "ready") return false;
+
     const ahead = getAheadSeconds(currentChunkIndex, chunks);
     if (ahead >= resumeSec) return true;
 

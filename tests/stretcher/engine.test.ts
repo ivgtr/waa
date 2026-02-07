@@ -239,6 +239,69 @@ describe("createStretcherEngine", () => {
     engine.dispose();
   });
 
+  it("ended 状態で setTempo を呼んでもテンポが変わらない", () => {
+    const ctx = createMockAudioContext();
+    const buffer = createMockAudioBuffer(60);
+
+    const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
+    engine.start();
+    engine.stop(); // → ended
+
+    expect(engine.getStatus().phase).toBe("ended");
+
+    engine.setTempo(2.0);
+
+    // テンポは変わらない
+    expect(engine.getStatus().playback.tempo).toBe(1.0);
+
+    engine.dispose();
+  });
+
+  it("連続テンポ変更で位置が保持される", () => {
+    const ctx = createMockAudioContext();
+    const buffer = createMockAudioBuffer(60);
+
+    const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
+    engine.start();
+
+    // buffering 中の初期位置
+    const posInitial = engine.getCurrentPosition();
+
+    // 連続テンポ変更
+    engine.setTempo(1.5);
+    const posAfterFirst = engine.getCurrentPosition();
+    expect(posAfterFirst).toBe(posInitial);
+
+    engine.setTempo(2.0);
+    const posAfterSecond = engine.getCurrentPosition();
+    expect(posAfterSecond).toBe(posInitial);
+
+    // テンポは最後に設定した値
+    expect(engine.getStatus().playback.tempo).toBe(2.0);
+
+    engine.dispose();
+  });
+
+  it("setTempo 後 buffering 復帰で再生可能な状態になる", () => {
+    const ctx = createMockAudioContext();
+    const buffer = createMockAudioBuffer(60);
+
+    const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
+    engine.start();
+
+    expect(engine.getStatus().phase).toBe("buffering");
+
+    // テンポ変更 → buffering に再入
+    engine.setTempo(2.0);
+    expect(engine.getStatus().phase).toBe("buffering");
+    expect(engine.getStatus().playback.tempo).toBe(2.0);
+
+    // 位置が保持されていること
+    expect(engine.getCurrentPosition()).toBe(0);
+
+    engine.dispose();
+  });
+
   it("event subscription and unsubscription works", () => {
     const ctx = createMockAudioContext();
     const buffer = createMockAudioBuffer(60);
