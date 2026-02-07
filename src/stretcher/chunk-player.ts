@@ -5,6 +5,20 @@
 import { CROSSFADE_SEC, LOOKAHEAD_INTERVAL_MS, LOOKAHEAD_THRESHOLD_SEC } from "./constants.js";
 import type { ChunkPlayer, ChunkPlayerOptions } from "./types.js";
 
+const CURVE_LENGTH = 256;
+
+function createEqualPowerCurve(fadeIn: boolean): Float32Array {
+  const curve = new Float32Array(CURVE_LENGTH);
+  for (let i = 0; i < CURVE_LENGTH; i++) {
+    const t = i / (CURVE_LENGTH - 1);
+    curve[i] = fadeIn ? Math.sin(t * Math.PI / 2) : Math.cos(t * Math.PI / 2);
+  }
+  return curve;
+}
+
+const fadeInCurve = createEqualPowerCurve(true);
+const fadeOutCurve = createEqualPowerCurve(false);
+
 /**
  * Create a chunk player that manages gapless playback of converted chunks.
  */
@@ -152,13 +166,9 @@ export function createChunkPlayer(
 
     currentSource.start(0, offsetInChunk);
 
-    // Apply fade-in
+    // Apply equal-power fade-in
     if (crossfadeSec > 0) {
-      currentGain.gain.setValueAtTime(0, ctx.currentTime);
-      currentGain.gain.linearRampToValueAtTime(
-        1,
-        ctx.currentTime + crossfadeSec,
-      );
+      currentGain.gain.setValueCurveAtTime(fadeInCurve, ctx.currentTime, crossfadeSec);
     }
 
     startLookahead();
@@ -178,15 +188,12 @@ export function createChunkPlayer(
       }
     };
 
-    nextSource.start(startTime);
+    nextSource.start(startTime - crossfadeSec);
 
-    // Crossfade: fade out current, fade in next
+    // Equal-power crossfade: fade out current, fade in next
     if (crossfadeSec > 0 && currentGain) {
-      currentGain.gain.setValueAtTime(1, startTime - crossfadeSec);
-      currentGain.gain.linearRampToValueAtTime(0, startTime);
-
-      nextGain.gain.setValueAtTime(0, startTime - crossfadeSec);
-      nextGain.gain.linearRampToValueAtTime(1, startTime);
+      currentGain.gain.setValueCurveAtTime(fadeOutCurve, startTime - crossfadeSec, crossfadeSec);
+      nextGain.gain.setValueCurveAtTime(fadeInCurve, startTime - crossfadeSec, crossfadeSec);
     }
 
     // After transition, promote next to current
@@ -206,7 +213,7 @@ export function createChunkPlayer(
 
       currentChunkDuration = buffer.duration;
       playStartOffset = 0;
-      playStartCtxTime = startTime;
+      playStartCtxTime = startTime - crossfadeSec;
 
       onTransition?.();
     }, transitionDelay);

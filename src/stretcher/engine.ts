@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { createEmitter } from "../emitter.js";
-import { CHUNK_DURATION_SEC, OVERLAP_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE } from "./constants.js";
+import { CHUNK_DURATION_SEC, OVERLAP_SEC, CROSSFADE_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE } from "./constants.js";
 import { splitIntoChunks, extractChunkData, getChunkIndexForTime } from "./chunk-splitter.js";
 import { createWorkerManager } from "./worker-manager.js";
 import { createConversionScheduler } from "./conversion-scheduler.js";
@@ -20,6 +20,43 @@ import type {
   StretcherStatus,
   WorkerResponse,
 } from "./types.js";
+
+/**
+ * Trim overlap regions from WSOLA output so adjacent chunks don't double-play.
+ */
+function trimOverlap(
+  outputData: Float32Array[],
+  outputLength: number,
+  chunk: ChunkInfo,
+  sampleRate: number,
+): { data: Float32Array[]; length: number } {
+  const inputLength = chunk.inputEndSample - chunk.inputStartSample;
+  if (inputLength === 0 || outputLength === 0) {
+    return { data: outputData, length: outputLength };
+  }
+
+  const ratio = outputLength / inputLength;
+  const crossfadeKeep = Math.round(CROSSFADE_SEC * sampleRate);
+  const overlapBeforeOutput = Math.round(chunk.overlapBefore * ratio);
+  const overlapAfterOutput = Math.round(chunk.overlapAfter * ratio);
+  const keepBefore = chunk.overlapBefore > 0 ? Math.min(crossfadeKeep, overlapBeforeOutput) : 0;
+  const trimStart = overlapBeforeOutput - keepBefore;
+  const trimEnd = overlapAfterOutput;
+  const newLength = outputLength - trimStart - trimEnd;
+
+  if (newLength <= 0) {
+    return { data: outputData, length: outputLength };
+  }
+
+  return {
+    data: outputData.map(ch => ch.slice(trimStart, trimStart + newLength)),
+    length: newLength,
+  };
+}
+
+function getCrossfadeStart(chunk: ChunkInfo): number {
+  return chunk.overlapBefore > 0 ? CROSSFADE_SEC : 0;
+}
 
 /**
  * Create the stretcher engine that orchestrates all components.
@@ -73,12 +110,18 @@ export function createStretcherEngine(
           const postTime = workerManager.getPostTimeForChunk(response.chunkIndex);
           const elapsed = postTime !== null ? performance.now() - postTime : 0;
           estimator.recordConversion(elapsed);
+          const trimmed = trimOverlap(
+            response.outputData!,
+            response.outputLength!,
+            chunk,
+            sampleRate,
+          );
+          schedulerInternal._handleResult(
+            response.chunkIndex,
+            trimmed.data,
+            trimmed.length,
+          );
         }
-        schedulerInternal._handleResult(
-          response.chunkIndex,
-          response.outputData!,
-          response.outputLength!,
-        );
       } else if (response.type === "cancelled") {
         // Chunk was cancelled, scheduler will re-dispatch
         const chunk = chunks[response.chunkIndex];
@@ -118,7 +161,7 @@ export function createStretcherEngine(
   const chunkPlayer = createChunkPlayer(ctx, {
     through,
     destination,
-    crossfadeSec: 0.01,
+    crossfadeSec: CROSSFADE_SEC,
   });
 
   chunkPlayer.setOnChunkEnded(() => {
@@ -205,14 +248,14 @@ export function createStretcherEngine(
     return audioBuf;
   }
 
-  function playCurrentChunk(offsetInChunk: number = 0): void {
+  function playCurrentChunk(offsetInBuffer: number = 0): void {
     const chunk = chunks[currentChunkIndex];
     if (!chunk || chunk.state !== "ready" || !chunk.outputBuffer) return;
 
     const audioBuf = createAudioBufferFromChunk(chunk);
     if (!audioBuf) return;
 
-    chunkPlayer.playChunk(audioBuf, ctx.currentTime, offsetInChunk);
+    chunkPlayer.playChunk(audioBuf, ctx.currentTime, offsetInBuffer);
   }
 
   function advanceToNextChunk(): void {
@@ -234,7 +277,7 @@ export function createStretcherEngine(
 
     const chunk = chunks[currentChunkIndex];
     if (chunk && chunk.state === "ready") {
-      playCurrentChunk();
+      playCurrentChunk(getCrossfadeStart(chunk));
     } else {
       const nextChunk = chunks[currentChunkIndex]!;
       const nominalStartSample = nextChunk.inputStartSample + nextChunk.overlapBefore;
@@ -280,12 +323,16 @@ export function createStretcherEngine(
           return;
         }
 
-        playCurrentChunk(offsetInOutput);
+        playCurrentChunk(getCrossfadeStart(chunk) + offsetInOutput);
       } else {
-        playCurrentChunk();
+        const cfChunk = chunks[currentChunkIndex];
+        const cfStart = cfChunk ? getCrossfadeStart(cfChunk) : 0;
+        playCurrentChunk(cfStart);
       }
     } else {
-      playCurrentChunk();
+      const chunk = chunks[currentChunkIndex];
+      const cfStart = chunk ? getCrossfadeStart(chunk) : 0;
+      playCurrentChunk(cfStart);
     }
   }
 
@@ -349,9 +396,13 @@ export function createStretcherEngine(
     // Position within the current chunk (in output time)
     const posInChunk = chunkPlayer.getCurrentPosition();
 
+    // Subtract the crossfade overlap kept at the start of non-first chunks
+    const crossfadeOffset = chunk.overlapBefore > 0 ? CROSSFADE_SEC : 0;
+    const adjustedPosInChunk = Math.max(0, posInChunk - crossfadeOffset);
+
     // Convert output position back to original buffer time
     // output duration = input duration / tempo
-    const posInOriginal = posInChunk * currentTempo;
+    const posInOriginal = adjustedPosInChunk * currentTempo;
 
     return Math.min(nominalStartSec + posInOriginal, totalDuration);
   }
@@ -455,7 +506,9 @@ export function createStretcherEngine(
         phase = "playing";
         const audioBuf = createAudioBufferFromChunk(chunk);
         if (audioBuf) {
-          const clampedOffset = Math.min(Math.max(0, offsetInOutput), audioBuf.duration - 0.001);
+          const crossfadeStart = getCrossfadeStart(chunk);
+          const bufferOffset = crossfadeStart + offsetInOutput;
+          const clampedOffset = Math.min(Math.max(0, bufferOffset), audioBuf.duration - 0.001);
           chunkPlayer.handleSeek(audioBuf, clampedOffset);
         }
       }
