@@ -22,6 +22,34 @@ import type {
 } from "./types.js";
 
 /**
+ * Trim overlap regions from WSOLA output so adjacent chunks don't double-play.
+ */
+function trimOverlap(
+  outputData: Float32Array[],
+  outputLength: number,
+  chunk: ChunkInfo,
+): { data: Float32Array[]; length: number } {
+  const inputLength = chunk.inputEndSample - chunk.inputStartSample;
+  if (inputLength === 0 || outputLength === 0) {
+    return { data: outputData, length: outputLength };
+  }
+
+  const ratio = outputLength / inputLength;
+  const trimStart = Math.round(chunk.overlapBefore * ratio);
+  const trimEnd = Math.round(chunk.overlapAfter * ratio);
+  const newLength = outputLength - trimStart - trimEnd;
+
+  if (newLength <= 0) {
+    return { data: outputData, length: outputLength };
+  }
+
+  return {
+    data: outputData.map(ch => ch.slice(trimStart, trimStart + newLength)),
+    length: newLength,
+  };
+}
+
+/**
  * Create the stretcher engine that orchestrates all components.
  */
 export function createStretcherEngine(
@@ -73,12 +101,17 @@ export function createStretcherEngine(
           const postTime = workerManager.getPostTimeForChunk(response.chunkIndex);
           const elapsed = postTime !== null ? performance.now() - postTime : 0;
           estimator.recordConversion(elapsed);
+          const trimmed = trimOverlap(
+            response.outputData!,
+            response.outputLength!,
+            chunk,
+          );
+          schedulerInternal._handleResult(
+            response.chunkIndex,
+            trimmed.data,
+            trimmed.length,
+          );
         }
-        schedulerInternal._handleResult(
-          response.chunkIndex,
-          response.outputData!,
-          response.outputLength!,
-        );
       } else if (response.type === "cancelled") {
         // Chunk was cancelled, scheduler will re-dispatch
         const chunk = chunks[response.chunkIndex];
