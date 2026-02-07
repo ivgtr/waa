@@ -196,7 +196,14 @@ export function createStretcherEngine(
       if (nextChunk.state === "ready" && nextChunk.outputBuffer) {
         const audioBuffer = createAudioBufferFromChunk(nextChunk);
         if (audioBuffer) {
-          chunkPlayer.scheduleNext(audioBuffer, ctx.currentTime + 0.3);
+          const curChunk = chunks[currentChunkIndex];
+          const curOutputDuration = curChunk
+            ? curChunk.outputLength / sampleRate
+            : 0;
+          const elapsed = chunkPlayer.getCurrentPosition();
+          const remaining = curOutputDuration - elapsed;
+          const startTime = ctx.currentTime + Math.max(0, remaining);
+          chunkPlayer.scheduleNext(audioBuffer, startTime);
         }
       }
     }
