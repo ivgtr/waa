@@ -35,11 +35,27 @@ export interface PlayOptions {
    * Interval (ms) for `timeupdate` events. @default 50
    */
   timeupdateInterval?: number;
+  /**
+   * Enable pitch-preserving time-stretch via WSOLA.
+   * When true, `playbackRate` controls tempo without changing pitch.
+   * @default false
+   */
+  preservePitch?: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Playback Snapshot (for framework adapters)
 // ---------------------------------------------------------------------------
+
+/** Stretcher snapshot extension (re-declared here to avoid static import). */
+export interface StretcherSnapshotExtension {
+  tempo: number;
+  converting: boolean;
+  conversionProgress: number;
+  bufferHealth: "healthy" | "low" | "critical" | "empty";
+  aheadSeconds: number;
+  buffering: boolean;
+}
 
 /** An immutable snapshot of a Playback's current state. */
 export interface PlaybackSnapshot {
@@ -47,6 +63,7 @@ export interface PlaybackSnapshot {
   position: number;
   duration: number;
   progress: number;
+  stretcher?: StretcherSnapshotExtension;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,6 +81,8 @@ export interface PlaybackEventMap {
   loop: void;
   statechange: { state: PlaybackState };
   timeupdate: { position: number; duration: number };
+  buffering: { reason: "initial" | "seek" | "tempo-change" | "underrun" };
+  buffered: { stallDuration: number };
 }
 
 // ---------------------------------------------------------------------------

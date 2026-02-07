@@ -352,6 +352,107 @@ header h1 {
   user-select: none;
 }
 
+/* ── Stretcher Status ────────────────────────────────────────── */
+
+.stretcher-status {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+}
+
+.stretcher-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.stretcher-status-title {
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.stretcher-buffering {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+
+.spinner-sm {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+}
+
+.stretcher-progress {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.stretcher-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.stretcher-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.buffer-health {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.buffer-healthy {
+  background: var(--success);
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
+}
+
+.buffer-low {
+  background: #eab308;
+  box-shadow: 0 0 4px rgba(234, 179, 8, 0.5);
+}
+
+.buffer-critical {
+  background: #ef4444;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
+}
+
+.buffer-empty {
+  background: #6b7280;
+}
+
+/* ── Waveform Buffer Bar ─────────────────────────────────────── */
+
+.waveform-buffer-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(99, 102, 241, 0.1);
+  pointer-events: none;
+  z-index: 1;
+  transition: width 0.3s ease;
+}
+
 /* ── Visualizer ──────────────────────────────────────────────── */
 
 #visualizer-canvas {

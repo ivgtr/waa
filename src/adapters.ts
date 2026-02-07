@@ -9,12 +9,23 @@ import type { Playback, PlaybackSnapshot } from "./types.js";
  * Designed for use with React's `useSyncExternalStore` or similar patterns.
  */
 export function getSnapshot(playback: Playback): PlaybackSnapshot {
-  return {
+  const base: PlaybackSnapshot = {
     state: playback.getState(),
     position: playback.getCurrentTime(),
     duration: playback.getDuration(),
     progress: playback.getProgress(),
   };
+
+  // Include stretcher snapshot if available (no static import required)
+  const getter = (playback as unknown as Record<string, unknown>)["_getStretcherSnapshot"];
+  if (typeof getter === "function") {
+    const stretcher = (getter as () => PlaybackSnapshot["stretcher"])();
+    if (stretcher) {
+      base.stretcher = stretcher;
+    }
+  }
+
+  return base;
 }
 
 /**

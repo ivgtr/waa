@@ -8,6 +8,7 @@ import type {
   PlaybackEventMap,
   PlaybackState,
   PlayOptions,
+  StretcherSnapshotExtension,
 } from "./types.js";
 
 /**
@@ -29,6 +30,13 @@ export function play(
   buffer: AudioBuffer,
   options?: PlayOptions,
 ): Playback {
+  const { preservePitch = false } = options ?? {};
+
+  // ----- Pitch-preserving mode (WSOLA-based time-stretch) -----
+  if (preservePitch) {
+    return createStretchedPlayback(ctx, buffer, options ?? {});
+  }
+
   const {
     offset: initialOffset = 0,
     loop = false,
@@ -246,4 +254,212 @@ export function play(
     off: emitter.off.bind(emitter) as Playback["off"],
     dispose,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Stretched playback (preservePitch: true)
+// ---------------------------------------------------------------------------
+
+function createStretchedPlayback(
+  ctx: AudioContext,
+  buffer: AudioBuffer,
+  options: PlayOptions,
+): Playback {
+  const {
+    offset: initialOffset = 0,
+    playbackRate: initialRate = 1,
+    through = [],
+    destination = ctx.destination,
+    timeupdateInterval = 50,
+  } = options;
+
+  const emitter = createEmitter<PlaybackEventMap>();
+  const duration = buffer.duration;
+
+  let state: PlaybackState = "playing";
+  let engineInstance: import("./stretcher/types.js").StretcherEngine | null =
+    null;
+  let timerId: ReturnType<typeof setInterval> | null = null;
+  let disposed = false;
+  let currentRate = initialRate;
+  let pendingSeek: number | null = null;
+
+  // Emit initial play event
+  emitter.emit("statechange", { state: "playing" });
+  emitter.emit("play", undefined as never);
+
+  // Fire-and-forget dynamic import of the stretcher engine
+  import("./stretcher/engine.js").then(({ createStretcherEngine }) => {
+    if (disposed) return;
+
+    engineInstance = createStretcherEngine(ctx, buffer, {
+      tempo: currentRate,
+      offset: initialOffset,
+      through,
+      destination,
+      timeupdateInterval,
+    });
+
+    // Wire stretcher events to playback events
+    engineInstance.on("buffering", (data) => {
+      if (disposed) return;
+      emitter.emit("buffering", data);
+    });
+
+    engineInstance.on("buffered", (data) => {
+      if (disposed) return;
+      emitter.emit("buffered", data);
+    });
+
+    engineInstance.on("ended", () => {
+      if (disposed) return;
+      state = "stopped";
+      stopTimer();
+      emitter.emit("statechange", { state: "stopped" });
+      emitter.emit("ended", undefined as never);
+    });
+
+    engineInstance.on("error", (data) => {
+      if (disposed) return;
+      if (data.fatal) {
+        state = "stopped";
+        emitter.emit("statechange", { state: "stopped" });
+        emitter.emit("ended", undefined as never);
+      }
+    });
+
+    // Start engine and timeupdate timer
+    engineInstance.start();
+    startTimer();
+
+    // Apply pending seek if any
+    if (pendingSeek !== null) {
+      engineInstance.seek(pendingSeek);
+      pendingSeek = null;
+    }
+
+    // If we were paused before the engine loaded, pause it
+    if (state === "paused") {
+      engineInstance.pause();
+    } else if (state === "stopped") {
+      engineInstance.stop();
+    }
+  });
+
+  function startTimer() {
+    if (timerId !== null) return;
+    timerId = setInterval(() => {
+      if (state !== "playing" || disposed) return;
+      emitter.emit("timeupdate", {
+        position: getCurrentTime(),
+        duration,
+      });
+    }, timeupdateInterval);
+  }
+
+  function stopTimer() {
+    if (timerId !== null) {
+      clearInterval(timerId);
+      timerId = null;
+    }
+  }
+
+  function getCurrentTime(): number {
+    if (pendingSeek !== null) {
+      return pendingSeek;
+    }
+    if (engineInstance) {
+      return engineInstance.getCurrentPosition();
+    }
+    return initialOffset;
+  }
+
+  function pause() {
+    if (state !== "playing" || disposed) return;
+    state = "paused";
+    engineInstance?.pause();
+    stopTimer();
+    emitter.emit("statechange", { state: "paused" });
+    emitter.emit("pause", undefined as never);
+  }
+
+  function resume() {
+    if (state !== "paused" || disposed) return;
+    state = "playing";
+    engineInstance?.resume();
+    startTimer();
+    emitter.emit("statechange", { state: "playing" });
+    emitter.emit("resume", undefined as never);
+  }
+
+  function togglePlayPause() {
+    if (state === "playing") pause();
+    else if (state === "paused") resume();
+  }
+
+  function seek(position: number) {
+    if (disposed) return;
+    const clamped = Math.max(0, Math.min(position, duration));
+    if (engineInstance) {
+      engineInstance.seek(clamped);
+    } else {
+      pendingSeek = clamped;
+    }
+    emitter.emit("seek", { position: clamped });
+  }
+
+  function stop() {
+    if (state === "stopped" || disposed) return;
+    state = "stopped";
+    engineInstance?.stop();
+    stopTimer();
+    emitter.emit("statechange", { state: "stopped" });
+    emitter.emit("stop", undefined as never);
+  }
+
+  function setPlaybackRate(rate: number) {
+    currentRate = rate;
+    if (engineInstance) {
+      engineInstance.setTempo(rate);
+    }
+  }
+
+  function setLoop(_value: boolean) {
+    // Loop is not supported in stretcher mode
+  }
+
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    stopTimer();
+    engineInstance?.dispose();
+    emitter.clear();
+  }
+
+  function _getStretcherSnapshot(): StretcherSnapshotExtension | null {
+    if (!engineInstance) return null;
+    return engineInstance.getSnapshot();
+  }
+
+  const playback: Playback & {
+    _getStretcherSnapshot: typeof _getStretcherSnapshot;
+  } = {
+    getState: () => state,
+    getCurrentTime,
+    getDuration: () => duration,
+    getProgress: () => (duration > 0 ? getCurrentTime() / duration : 0),
+    pause,
+    resume,
+    togglePlayPause,
+    seek,
+    stop,
+    setPlaybackRate,
+    setLoop,
+    on: emitter.on.bind(emitter) as Playback["on"],
+    off: emitter.off.bind(emitter) as Playback["off"],
+    dispose,
+    _getStretcherSnapshot,
+  };
+
+  return playback;
 }

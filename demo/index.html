@@ -58,6 +58,7 @@
         <section class="card" id="waveform-section" hidden>
           <h2>Waveform</h2>
           <div class="waveform-container">
+            <div id="waveform-buffer-bar" class="waveform-buffer-bar" style="width: 0%"></div>
             <canvas id="waveform-canvas"></canvas>
             <div id="waveform-cursor" class="waveform-cursor"></div>
           </div>
@@ -104,6 +105,28 @@
                 <input type="checkbox" id="loop" />
                 Loop
               </label>
+              <label class="control-label control-label-checkbox">
+                <input type="checkbox" id="preserve-pitch" />
+                Preserve Pitch
+              </label>
+            </div>
+          </div>
+
+          <!-- Stretcher Status -->
+          <div id="stretcher-status" class="stretcher-status" hidden>
+            <div class="stretcher-status-header">
+              <span class="stretcher-status-title">Stretcher Engine</span>
+              <span id="stretcher-buffering" class="stretcher-buffering" hidden>
+                <span class="spinner spinner-sm"></span>
+                Buffering...
+              </span>
+            </div>
+            <div class="stretcher-progress">
+              <div id="stretcher-progress-fill" class="stretcher-progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="stretcher-info">
+              <span id="buffer-health" class="buffer-health buffer-empty"></span>
+              <span id="stretcher-detail" class="stretcher-detail"></span>
             </div>
           </div>
         </section>

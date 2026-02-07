@@ -21,6 +21,7 @@ export type {
   PlayOptions,
   ScheduledEvent,
   SchedulerOptions,
+  StretcherSnapshotExtension,
 } from "./types.js";
 
 // M1: Context

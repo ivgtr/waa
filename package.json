@@ -76,6 +76,12 @@
         "types": "./dist/adapters.d.ts",
         "default": "./dist/adapters.js"
       }
+    },
+    "./stretcher": {
+      "import": {
+        "types": "./dist/stretcher.d.ts",
+        "default": "./dist/stretcher.js"
+      }
     }
   },
   "sideEffects": false,
