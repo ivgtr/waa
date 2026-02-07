@@ -1,0 +1,41 @@
+// ---------------------------------------------------------------------------
+// Stretcher: Constants
+// ---------------------------------------------------------------------------
+
+// Chunk splitting
+export const CHUNK_DURATION_SEC = 30;
+export const OVERLAP_SEC = 0.2;
+export const CROSSFADE_SEC = 0.01;
+
+// WSOLA algorithm parameters
+export const WSOLA_FRAME_SIZE = 1024;
+export const WSOLA_HOP_SIZE = 512;
+export const WSOLA_TOLERANCE = 2048;
+
+// Priority scheduling weights
+export const PRIORITY_FORWARD_WEIGHT = 1.0;
+export const PRIORITY_BACKWARD_WEIGHT = 2.5;
+export const CANCEL_DISTANCE_THRESHOLD = 2;
+
+// Buffer health thresholds (seconds)
+export const BUFFER_HEALTHY_SEC = 60;
+export const BUFFER_LOW_SEC = 15;
+export const BUFFER_CRITICAL_SEC = 3;
+export const BUFFER_RESUME_SEC = 10;
+
+// Memory management
+export const KEEP_AHEAD_CHUNKS = 5;
+export const KEEP_AHEAD_SECONDS = 150;
+export const KEEP_BEHIND_CHUNKS = 2;
+export const KEEP_BEHIND_SECONDS = 60;
+
+// Error recovery
+export const MAX_WORKER_CRASHES = 3;
+export const MAX_CHUNK_RETRIES = 3;
+
+// Estimation
+export const ESTIMATOR_WINDOW_SIZE = 10;
+
+// Playback lookahead
+export const LOOKAHEAD_INTERVAL_MS = 200;
+export const LOOKAHEAD_THRESHOLD_SEC = 0.5;
