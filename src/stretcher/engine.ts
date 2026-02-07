@@ -66,11 +66,10 @@ export function createStretcherEngine(
     (response: WorkerResponse) => {
       if (disposed) return;
       if (response.type === "result") {
-        const startTime = performance.now();
         const chunk = chunks[response.chunkIndex];
         if (chunk) {
-          // Record conversion time
-          const elapsed = performance.now() - startTime;
+          const postTime = workerManager.getLastPostTime();
+          const elapsed = postTime !== null ? performance.now() - postTime : 0;
           estimator.recordConversion(elapsed);
         }
         schedulerInternal._handleResult(

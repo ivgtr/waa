@@ -206,6 +206,7 @@ export interface WorkerManager {
   cancelCurrent(): void;
   isBusy(): boolean;
   getCurrentChunkIndex(): number | null;
+  getLastPostTime(): number | null;
   terminate(): void;
 }
 

@@ -20,6 +20,7 @@ export function createWorkerManager(
   let busy = false;
   let currentChunkIndex: number | null = null;
   let terminated = false;
+  let lastPostTime: number | null = null;
 
   function spawnWorker(): void {
     if (terminated) return;
@@ -99,6 +100,7 @@ export function createWorkerManager(
       if (terminated || !worker) return;
       busy = true;
       currentChunkIndex = chunkIndex;
+      lastPostTime = performance.now();
 
       // Transfer the buffers for zero-copy
       const transferables = inputData.map((ch) => ch.buffer);
@@ -119,6 +121,10 @@ export function createWorkerManager(
 
     getCurrentChunkIndex(): number | null {
       return currentChunkIndex;
+    },
+
+    getLastPostTime(): number | null {
+      return lastPostTime;
     },
 
     terminate(): void {
