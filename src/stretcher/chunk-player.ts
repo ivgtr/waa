@@ -178,7 +178,7 @@ export function createChunkPlayer(
       }
     };
 
-    nextSource.start(startTime);
+    nextSource.start(startTime - crossfadeSec);
 
     // Crossfade: fade out current, fade in next
     if (crossfadeSec > 0 && currentGain) {
@@ -206,7 +206,7 @@ export function createChunkPlayer(
 
       currentChunkDuration = buffer.duration;
       playStartOffset = 0;
-      playStartCtxTime = startTime;
+      playStartCtxTime = startTime - crossfadeSec;
 
       onTransition?.();
     }, transitionDelay);

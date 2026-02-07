@@ -5,7 +5,7 @@
 // Chunk splitting
 export const CHUNK_DURATION_SEC = 5;
 export const OVERLAP_SEC = 0.2;
-export const CROSSFADE_SEC = 0.01;
+export const CROSSFADE_SEC = 0.1;
 
 // WSOLA algorithm parameters
 export const WSOLA_FRAME_SIZE = 1024;

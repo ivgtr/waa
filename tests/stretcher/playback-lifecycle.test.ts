@@ -176,10 +176,13 @@ describe("playback lifecycle (chunk progression)", () => {
   const CHUNK1_RAW = 238140;  // nominal 5s + overlap 0.2s × 2
   const CHUNK2_RAW = 229320;  // nominal 5s + overlapBefore 0.2s
 
-  // engine 内で trim 後に createBuffer に渡される長さ = nominal 5.0s
-  const CHUNK0_TRIMMED = 220500;  // 229320 - 0 - 8820
-  const CHUNK1_TRIMMED = 220500;  // 238140 - 8820 - 8820
-  const CHUNK2_TRIMMED = 220500;  // 229320 - 8820 - 0
+  // engine 内で trim 後に createBuffer に渡される長さ
+  // Chunk 0: overlapBefore=0 → keepBefore=0, trimStart=0, trimEnd=8820 → 229320-0-8820=220500
+  // Chunk 1: overlapBefore>0 → keepBefore=min(4410,8820)=4410, trimStart=8820-4410=4410, trimEnd=8820 → 238140-4410-8820=224910
+  // Chunk 2: overlapBefore>0 → keepBefore=min(4410,8820)=4410, trimStart=8820-4410=4410, trimEnd=0 → 229320-4410-0=224910
+  const CHUNK0_TRIMMED = 220500;
+  const CHUNK1_TRIMMED = 224910;
+  const CHUNK2_TRIMMED = 224910;
 
   it("直接パス: chunk 0 → onended → chunk 1 へ正常に進む", () => {
     const ctx = createMockAudioContext();

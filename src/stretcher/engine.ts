@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { createEmitter } from "../emitter.js";
-import { CHUNK_DURATION_SEC, OVERLAP_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE } from "./constants.js";
+import { CHUNK_DURATION_SEC, OVERLAP_SEC, CROSSFADE_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE } from "./constants.js";
 import { splitIntoChunks, extractChunkData, getChunkIndexForTime } from "./chunk-splitter.js";
 import { createWorkerManager } from "./worker-manager.js";
 import { createConversionScheduler } from "./conversion-scheduler.js";
@@ -28,6 +28,7 @@ function trimOverlap(
   outputData: Float32Array[],
   outputLength: number,
   chunk: ChunkInfo,
+  sampleRate: number,
 ): { data: Float32Array[]; length: number } {
   const inputLength = chunk.inputEndSample - chunk.inputStartSample;
   if (inputLength === 0 || outputLength === 0) {
@@ -35,8 +36,12 @@ function trimOverlap(
   }
 
   const ratio = outputLength / inputLength;
-  const trimStart = Math.round(chunk.overlapBefore * ratio);
-  const trimEnd = Math.round(chunk.overlapAfter * ratio);
+  const crossfadeKeep = Math.round(CROSSFADE_SEC * sampleRate);
+  const overlapBeforeOutput = Math.round(chunk.overlapBefore * ratio);
+  const overlapAfterOutput = Math.round(chunk.overlapAfter * ratio);
+  const keepBefore = chunk.overlapBefore > 0 ? Math.min(crossfadeKeep, overlapBeforeOutput) : 0;
+  const trimStart = overlapBeforeOutput - keepBefore;
+  const trimEnd = overlapAfterOutput;
   const newLength = outputLength - trimStart - trimEnd;
 
   if (newLength <= 0) {
@@ -105,6 +110,7 @@ export function createStretcherEngine(
             response.outputData!,
             response.outputLength!,
             chunk,
+            sampleRate,
           );
           schedulerInternal._handleResult(
             response.chunkIndex,
@@ -151,7 +157,7 @@ export function createStretcherEngine(
   const chunkPlayer = createChunkPlayer(ctx, {
     through,
     destination,
-    crossfadeSec: 0.01,
+    crossfadeSec: CROSSFADE_SEC,
   });
 
   chunkPlayer.setOnChunkEnded(() => {
@@ -245,7 +251,8 @@ export function createStretcherEngine(
     const audioBuf = createAudioBufferFromChunk(chunk);
     if (!audioBuf) return;
 
-    chunkPlayer.playChunk(audioBuf, ctx.currentTime, offsetInChunk);
+    const crossfadeStart = chunk.overlapBefore > 0 ? CROSSFADE_SEC : 0;
+    chunkPlayer.playChunk(audioBuf, ctx.currentTime, crossfadeStart + offsetInChunk);
   }
 
   function advanceToNextChunk(): void {
@@ -382,9 +389,13 @@ export function createStretcherEngine(
     // Position within the current chunk (in output time)
     const posInChunk = chunkPlayer.getCurrentPosition();
 
+    // Subtract the crossfade overlap kept at the start of non-first chunks
+    const crossfadeOffset = chunk.overlapBefore > 0 ? CROSSFADE_SEC : 0;
+    const adjustedPosInChunk = Math.max(0, posInChunk - crossfadeOffset);
+
     // Convert output position back to original buffer time
     // output duration = input duration / tempo
-    const posInOriginal = posInChunk * currentTempo;
+    const posInOriginal = adjustedPosInChunk * currentTempo;
 
     return Math.min(nominalStartSec + posInOriginal, totalDuration);
   }
