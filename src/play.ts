@@ -33,7 +33,7 @@ export function play(
   const { preservePitch = false } = options ?? {};
 
   // ----- Pitch-preserving mode (WSOLA-based time-stretch) -----
-  if (preservePitch && (options?.playbackRate ?? 1) !== 1) {
+  if (preservePitch) {
     return createStretchedPlayback(ctx, buffer, options ?? {});
   }
 
