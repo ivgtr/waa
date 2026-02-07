@@ -270,6 +270,7 @@ export interface ChunkPlayer {
     offsetInChunk?: number,
   ): void;
   scheduleNext(buffer: AudioBuffer, startTime: number): void;
+  hasNextScheduled(): boolean;
   handleSeek(buffer: AudioBuffer, offsetInChunk: number): void;
   pause(): void;
   resume(): void;

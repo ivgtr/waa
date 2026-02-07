@@ -254,9 +254,14 @@ export function createChunkPlayer(
     return getElapsedInChunk();
   }
 
+  function hasNextScheduled(): boolean {
+    return nextSource !== null;
+  }
+
   return {
     playChunk,
     scheduleNext,
+    hasNextScheduled,
     handleSeek,
     pause,
     resume,

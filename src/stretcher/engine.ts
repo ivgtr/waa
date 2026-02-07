@@ -3,9 +3,10 @@
 // ---------------------------------------------------------------------------
 
 import { createEmitter } from "../emitter.js";
-import { CHUNK_DURATION_SEC, OVERLAP_SEC, CROSSFADE_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE } from "./constants.js";
+import { CHUNK_DURATION_SEC, OVERLAP_SEC, CROSSFADE_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE, LOOKAHEAD_THRESHOLD_SEC } from "./constants.js";
 import { splitIntoChunks, extractChunkData, getChunkIndexForTime } from "./chunk-splitter.js";
 import { createWorkerManager } from "./worker-manager.js";
+import { createMainThreadProcessor } from "./main-thread-processor.js";
 import { createConversionScheduler } from "./conversion-scheduler.js";
 import { createChunkPlayer } from "./chunk-player.js";
 import { createBufferMonitor } from "./buffer-monitor.js";
@@ -18,6 +19,7 @@ import type {
   StretcherPlaybackState,
   StretcherSnapshotExtension,
   StretcherStatus,
+  WorkerManager,
   WorkerResponse,
 } from "./types.js";
 
@@ -103,49 +105,62 @@ export function createStretcherEngine(
   // Buffer monitor
   const monitor = createBufferMonitor();
 
-  // Worker manager
+  // Worker manager (with main-thread fallback)
   const poolSize = options.workerPoolSize ?? WORKER_POOL_SIZE;
-  const workerManager = createWorkerManager(
-    (response: WorkerResponse) => {
-      if (disposed) return;
-      if (response.type === "result") {
-        const chunk = chunks[response.chunkIndex];
-        if (chunk) {
-          const postTime = workerManager.getPostTimeForChunk(response.chunkIndex);
-          const elapsed = postTime !== null ? performance.now() - postTime : 0;
-          estimator.recordConversion(elapsed);
-          const trimmed = trimOverlap(
-            response.outputData!,
-            response.outputLength!,
-            chunk,
-            sampleRate,
-          );
-          schedulerInternal._handleResult(
-            response.chunkIndex,
-            trimmed.data,
-            trimmed.length,
-          );
-        }
-      } else if (response.type === "cancelled") {
-        // Chunk was cancelled, scheduler will re-dispatch
-        const chunk = chunks[response.chunkIndex];
-        if (chunk && chunk.state === "converting") {
-          chunk.state = "queued";
-        }
-        scheduler.dispatchNext();
-      }
-    },
-    (response: WorkerResponse) => {
-      if (disposed) return;
-      if (response.type === "error") {
-        schedulerInternal._handleError(
+
+  function handleWorkerResult(response: WorkerResponse): void {
+    if (disposed) return;
+    if (response.type === "result") {
+      const chunk = chunks[response.chunkIndex];
+      if (chunk) {
+        const postTime = workerManager.getPostTimeForChunk(response.chunkIndex);
+        const elapsed = postTime !== null ? performance.now() - postTime : 0;
+        estimator.recordConversion(elapsed);
+        const trimmed = trimOverlap(
+          response.outputData!,
+          response.outputLength!,
+          chunk,
+          sampleRate,
+        );
+        schedulerInternal._handleResult(
           response.chunkIndex,
-          response.error ?? "Unknown error",
+          trimmed.data,
+          trimmed.length,
         );
       }
-    },
+    } else if (response.type === "cancelled") {
+      const chunk = chunks[response.chunkIndex];
+      if (chunk && chunk.state === "converting") {
+        chunk.state = "queued";
+      }
+      scheduler.dispatchNext();
+    }
+  }
+
+  function handleWorkerError(response: WorkerResponse): void {
+    if (disposed) return;
+    if (response.type === "error") {
+      schedulerInternal._handleError(
+        response.chunkIndex,
+        response.error ?? "Unknown error",
+      );
+    }
+  }
+
+  function switchToMainThread(): void {
+    if (disposed) return;
+    const fallback = createMainThreadProcessor(handleWorkerResult, handleWorkerError);
+    // Replace the workerManager reference
+    workerManager.terminate();
+    Object.assign(workerManager, fallback);
+  }
+
+  const workerManager: WorkerManager = createWorkerManager(
+    handleWorkerResult,
+    handleWorkerError,
     undefined,
     poolSize,
+    switchToMainThread,
   );
 
   // Conversion scheduler
@@ -211,6 +226,29 @@ export function createStretcherEngine(
     if (phase === "waiting" || phase === "buffering") {
       if (monitor.shouldExitBuffering(currentChunkIndex, chunks)) {
         exitBuffering();
+      }
+    }
+
+    // Proactively schedule next chunk when it becomes ready (background tab resilience)
+    if (phase === "playing" && chunkIndex === currentChunkIndex + 1) {
+      if (!chunkPlayer.hasNextScheduled()) {
+        const curChunk = chunks[currentChunkIndex];
+        const curOutputDuration = curChunk
+          ? curChunk.outputLength / sampleRate
+          : 0;
+        const elapsed = chunkPlayer.getCurrentPosition();
+        const remaining = curOutputDuration - elapsed;
+
+        if (remaining <= LOOKAHEAD_THRESHOLD_SEC) {
+          const nextChunk = chunks[chunkIndex];
+          if (nextChunk && nextChunk.outputBuffer) {
+            const audioBuffer = createAudioBufferFromChunk(nextChunk);
+            if (audioBuffer) {
+              const startTime = ctx.currentTime + Math.max(0, remaining);
+              chunkPlayer.scheduleNext(audioBuffer, startTime);
+            }
+          }
+        }
       }
     }
 
