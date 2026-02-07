@@ -2,15 +2,13 @@
 
 Composable Web Audio API utilities.
 
-BYO AudioContext / Zero Dependencies / Framework-agnostic / Sample-accurate
+BYO AudioContext / Zero Dependencies / Framework-agnostic / Sample-accurate / Pitch-preserving time-stretch
 
 **[Demo](https://ivgtr.github.io/waa/)**
 
 ## What is this?
 
-ブラウザの Web Audio API をもうちょっと使いやすくするためのユーティリティ集です。
-
-既存のオーディオライブラリは独自の AudioContext を内部で抱えていたり、フレームワークに依存していたりして、ちょっとした音声再生をしたいだけなのに大げさになりがちです。waa は「AudioContext は自分で持ってきてね」というスタンスで、必要な関数だけ import して組み合わせて使えるようにしています。
+再生からピッチ保持タイムストレッチまで、必要な機能を関数単位で組み合わせられる Web Audio ライブラリです。
 
 ## Features
 
@@ -20,6 +18,7 @@ BYO AudioContext / Zero Dependencies / Framework-agnostic / Sample-accurate
 - **Framework-agnostic** — React / Vue / Svelte / Vanilla JS どれでも同じ API
 - **Sample-accurate** — `AudioContext.currentTime` ベースの精密な再生位置追跡
 - **Tree-shakeable** — 使う関数だけがバンドルに入る
+- **Pitch-preserving time-stretch** — WSOLA アルゴリズムによるテンポ変更、Web Worker でメインスレッドをブロックしない
 
 ## Install
 
@@ -61,7 +60,8 @@ import { extractPeaks } from "waa/waveform";
 |--------|------|
 | `context` | AudioContext の作成・resume・現在時刻の取得 |
 | `buffer` | URL や Blob からの音声ロード・デコード |
-| `play` | 再生エンジン（play / pause / seek / loop / events） |
+| `play` | 再生エンジン（play / pause / seek / loop / events / preservePitch） |
+| `emitter` | 型安全なイベントエミッター |
 | `nodes` | GainNode, AnalyserNode, Filter 等のファクトリとチェーン接続 |
 | `waveform` | ピーク抽出・RMS 計算（波形描画用） |
 | `fade` | フェードイン・アウト・クロスフェード |
@@ -133,6 +133,32 @@ function usePlayback(playback: Playback | null) {
     () => (playback ? getSnapshot(playback) : null),
   );
 }
+```
+
+### ピッチを保持したままテンポを変更
+
+```ts
+import { createContext, loadBuffer, play, onFrame } from "waa";
+
+const ctx = createContext();
+const buffer = await loadBuffer(ctx, "/audio/track.mp3");
+
+// preservePitch: true を渡すだけでピッチ保持タイムストレッチが有効に
+const playback = play(ctx, buffer, {
+  playbackRate: 0.75,     // テンポ 75%（スロー再生）
+  preservePitch: true,    // ピッチは変わらない
+});
+
+// 再生中にテンポを変更
+playback.setPlaybackRate(1.25); // テンポ 125%（高速再生）
+
+// stretcher の状態を監視
+const stopLoop = onFrame(playback, (snapshot) => {
+  if (snapshot.stretcher) {
+    console.log(`変換進捗: ${(snapshot.stretcher.conversionProgress * 100).toFixed(0)}%`);
+    console.log(`バッファ: ${snapshot.stretcher.bufferHealth}`);
+  }
+});
 ```
 
 ### 他のライブラリの AudioContext を使う
