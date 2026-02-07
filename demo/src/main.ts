@@ -197,12 +197,13 @@ function loadAudio(buffer: AudioBuffer) {
 
   // Extract waveform peaks
   peaks = extractPeakPairs(buffer, { resolution: 300 });
-  drawWaveform(peaks);
 
-  // Show sections
+  // Show sections first so the canvas has layout dimensions for drawing
   waveformSection.hidden = false;
   playbackSection.hidden = false;
   visualizerSection.hidden = false;
+
+  drawWaveform(peaks);
 
   // Update duration display
   timeDuration.textContent = formatTime(buffer.duration);
