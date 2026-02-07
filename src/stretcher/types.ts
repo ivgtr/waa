@@ -127,6 +127,7 @@ export interface StretcherEngineOptions {
   through?: AudioNode[];
   destination?: AudioNode;
   timeupdateInterval?: number;
+  workerPoolSize?: number;
 }
 
 /** Aggregate status of the stretcher engine. */
@@ -205,9 +206,12 @@ export interface WorkerManager {
     sampleRate: number,
   ): void;
   cancelCurrent(): void;
+  cancelChunk(chunkIndex: number): void;
   isBusy(): boolean;
+  hasCapacity(): boolean;
   getCurrentChunkIndex(): number | null;
   getLastPostTime(): number | null;
+  getPostTimeForChunk(chunkIndex: number): number | null;
   terminate(): void;
 }
 
@@ -265,6 +269,7 @@ export interface ChunkPlayer {
   getCurrentPosition(): number;
   setOnChunkEnded(callback: () => void): void;
   setOnNeedNext(callback: () => void): void;
+  setOnTransition(callback: () => void): void;
   dispose(): void;
 }
 

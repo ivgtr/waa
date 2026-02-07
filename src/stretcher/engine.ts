@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { createEmitter } from "../emitter.js";
-import { CHUNK_DURATION_SEC, OVERLAP_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS } from "./constants.js";
+import { CHUNK_DURATION_SEC, OVERLAP_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE } from "./constants.js";
 import { splitIntoChunks, extractChunkData, getChunkIndexForTime } from "./chunk-splitter.js";
 import { createWorkerManager } from "./worker-manager.js";
 import { createConversionScheduler } from "./conversion-scheduler.js";
@@ -63,13 +63,14 @@ export function createStretcherEngine(
   const monitor = createBufferMonitor();
 
   // Worker manager
+  const poolSize = options.workerPoolSize ?? WORKER_POOL_SIZE;
   const workerManager = createWorkerManager(
     (response: WorkerResponse) => {
       if (disposed) return;
       if (response.type === "result") {
         const chunk = chunks[response.chunkIndex];
         if (chunk) {
-          const postTime = workerManager.getLastPostTime();
+          const postTime = workerManager.getPostTimeForChunk(response.chunkIndex);
           const elapsed = postTime !== null ? performance.now() - postTime : 0;
           estimator.recordConversion(elapsed);
         }
@@ -96,6 +97,8 @@ export function createStretcherEngine(
         );
       }
     },
+    undefined,
+    poolSize,
   );
 
   // Conversion scheduler
@@ -134,6 +137,17 @@ export function createStretcherEngine(
           chunkPlayer.scheduleNext(audioBuffer, ctx.currentTime + 0.3);
         }
       }
+    }
+  });
+
+  chunkPlayer.setOnTransition(() => {
+    if (disposed) return;
+    // scheduleNext の transition 完了: chunk N+1 が current に昇格した
+    const nextIdx = currentChunkIndex + 1;
+    if (nextIdx < chunks.length) {
+      currentChunkIndex = nextIdx;
+      scheduler.updatePriorities(currentChunkIndex);
+      evictDistantChunks();
     }
   });
 
@@ -249,17 +263,27 @@ export function createStretcherEngine(
     emitter.emit("buffered", { stallDuration });
 
     if (bufferingResumePosition !== null) {
+      const resumePos = bufferingResumePosition;
+      bufferingResumePosition = null;
+
       const chunk = chunks[currentChunkIndex];
-      if (chunk) {
+      if (chunk && chunk.state === "ready" && chunk.outputBuffer) {
         const nominalStartSample = chunk.inputStartSample + chunk.overlapBefore;
         const nominalStartSec = nominalStartSample / sampleRate;
-        const offsetInOriginal = bufferingResumePosition - nominalStartSec;
+        const offsetInOriginal = resumePos - nominalStartSec;
         const offsetInOutput = Math.max(0, offsetInOriginal / currentTempo);
+        const outputDurationSec = chunk.outputLength / sampleRate;
+
+        const MIN_PLAYABLE_SEC = 0.05;
+        if (outputDurationSec > 0 && offsetInOutput >= outputDurationSec - MIN_PLAYABLE_SEC) {
+          advanceToNextChunk();
+          return;
+        }
+
         playCurrentChunk(offsetInOutput);
       } else {
         playCurrentChunk();
       }
-      bufferingResumePosition = null;
     } else {
       playCurrentChunk();
     }
@@ -431,7 +455,8 @@ export function createStretcherEngine(
         phase = "playing";
         const audioBuf = createAudioBufferFromChunk(chunk);
         if (audioBuf) {
-          chunkPlayer.handleSeek(audioBuf, Math.max(0, offsetInOutput));
+          const clampedOffset = Math.min(Math.max(0, offsetInOutput), audioBuf.duration - 0.001);
+          chunkPlayer.handleSeek(audioBuf, clampedOffset);
         }
       }
     } else {
@@ -447,10 +472,12 @@ export function createStretcherEngine(
   }
 
   function setTempo(newTempo: number): void {
-    if (disposed || newTempo === currentTempo) return;
+    if (disposed || phase === "ended" || newTempo === currentTempo) return;
     bufferingResumePosition = getPositionInOriginalBuffer();
+    currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition, sampleRate);
     currentTempo = newTempo;
     enterBuffering("tempo-change");
+    scheduler.updatePriorities(currentChunkIndex);
     scheduler.handleTempoChange(newTempo);
   }
 

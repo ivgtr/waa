@@ -1,44 +1,57 @@
 // ---------------------------------------------------------------------------
-// Stretcher: Worker manager
+// Stretcher: Worker manager (pool)
 // ---------------------------------------------------------------------------
 
-import { MAX_WORKER_CRASHES } from "./constants.js";
+import { MAX_WORKER_CRASHES, WORKER_POOL_SIZE } from "./constants.js";
 import { createWorkerURL, revokeWorkerURL } from "./worker-inline.js";
 import type { WorkerManager, WorkerResponse } from "./types.js";
 
+interface WorkerSlot {
+  worker: Worker | null;
+  busy: boolean;
+  currentChunkIndex: number | null;
+  crashCount: number;
+}
+
 /**
- * Create a Worker manager that handles Worker lifecycle, messaging, and crash recovery.
+ * Create a Worker manager that uses a pool of Workers for parallel conversion.
  */
 export function createWorkerManager(
   onResult: (response: WorkerResponse) => void,
   onError: (response: WorkerResponse) => void,
   maxCrashes: number = MAX_WORKER_CRASHES,
+  poolSize: number = WORKER_POOL_SIZE,
 ): WorkerManager {
   let workerURL: string | null = null;
-  let worker: Worker | null = null;
-  let crashCount = 0;
-  let busy = false;
-  let currentChunkIndex: number | null = null;
   let terminated = false;
-  let lastPostTime: number | null = null;
+  const postTimes = new Map<number, number>();
 
-  function spawnWorker(): void {
+  const slots: WorkerSlot[] = [];
+
+  function ensureWorkerURL(): string {
+    if (!workerURL) {
+      workerURL = createWorkerURL();
+    }
+    return workerURL;
+  }
+
+  function spawnWorkerForSlot(slot: WorkerSlot): void {
     if (terminated) return;
 
-    workerURL = createWorkerURL();
-    worker = new Worker(workerURL);
+    const url = ensureWorkerURL();
+    const worker = new Worker(url);
 
     worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       const response = e.data;
 
       if (response.type === "result" || response.type === "cancelled") {
-        busy = false;
-        currentChunkIndex = null;
+        slot.busy = false;
+        slot.currentChunkIndex = null;
       }
 
       if (response.type === "error") {
-        busy = false;
-        currentChunkIndex = null;
+        slot.busy = false;
+        slot.currentChunkIndex = null;
         onError(response);
         return;
       }
@@ -48,11 +61,11 @@ export function createWorkerManager(
 
     worker.onerror = (e: ErrorEvent) => {
       e.preventDefault();
-      busy = false;
-      const failedChunkIndex = currentChunkIndex;
-      currentChunkIndex = null;
+      slot.busy = false;
+      const failedChunkIndex = slot.currentChunkIndex;
+      slot.currentChunkIndex = null;
 
-      crashCount++;
+      slot.crashCount++;
 
       if (failedChunkIndex !== null) {
         onError({
@@ -62,33 +75,58 @@ export function createWorkerManager(
         });
       }
 
-      // Cleanup current worker
-      if (worker) {
-        worker.onmessage = null;
-        worker.onerror = null;
-        worker.terminate();
-        worker = null;
-      }
-      if (workerURL) {
-        revokeWorkerURL(workerURL);
-        workerURL = null;
+      // Cleanup crashed worker
+      if (slot.worker) {
+        slot.worker.onmessage = null;
+        slot.worker.onerror = null;
+        slot.worker.terminate();
+        slot.worker = null;
       }
 
       // Auto-respawn if under crash limit
-      if (crashCount < maxCrashes) {
-        spawnWorker();
+      if (slot.crashCount < maxCrashes) {
+        spawnWorkerForSlot(slot);
       } else {
         onError({
           type: "error",
           chunkIndex: failedChunkIndex ?? -1,
-          error: `Worker crashed ${crashCount} times, giving up`,
+          error: `Worker crashed ${slot.crashCount} times, giving up`,
         });
       }
     };
+
+    slot.worker = worker;
   }
 
-  // Initial spawn
-  spawnWorker();
+  // Initialize pool
+  for (let i = 0; i < poolSize; i++) {
+    const slot: WorkerSlot = {
+      worker: null,
+      busy: false,
+      currentChunkIndex: null,
+      crashCount: 0,
+    };
+    slots.push(slot);
+    spawnWorkerForSlot(slot);
+  }
+
+  function findFreeSlot(): WorkerSlot | null {
+    for (const slot of slots) {
+      if (!slot.busy && slot.worker) {
+        return slot;
+      }
+    }
+    return null;
+  }
+
+  function findSlotByChunk(chunkIndex: number): WorkerSlot | null {
+    for (const slot of slots) {
+      if (slot.busy && slot.currentChunkIndex === chunkIndex) {
+        return slot;
+      }
+    }
+    return null;
+  }
 
   return {
     postConvert(
@@ -97,49 +135,89 @@ export function createWorkerManager(
       tempo: number,
       sampleRate: number,
     ): void {
-      if (terminated || !worker) return;
-      busy = true;
-      currentChunkIndex = chunkIndex;
-      lastPostTime = performance.now();
+      if (terminated) return;
+
+      const slot = findFreeSlot();
+      if (!slot || !slot.worker) return;
+
+      slot.busy = true;
+      slot.currentChunkIndex = chunkIndex;
+      postTimes.set(chunkIndex, performance.now());
 
       // Transfer the buffers for zero-copy
       const transferables = inputData.map((ch) => ch.buffer);
-      worker.postMessage(
+      slot.worker.postMessage(
         { type: "convert", chunkIndex, inputData, tempo, sampleRate },
         transferables,
       );
     },
 
     cancelCurrent(): void {
-      if (terminated || !worker || !busy) return;
-      worker.postMessage({ type: "cancel", chunkIndex: currentChunkIndex });
+      if (terminated) return;
+      for (const slot of slots) {
+        if (slot.busy && slot.worker && slot.currentChunkIndex !== null) {
+          slot.worker.postMessage({ type: "cancel", chunkIndex: slot.currentChunkIndex });
+        }
+      }
+    },
+
+    cancelChunk(chunkIndex: number): void {
+      if (terminated) return;
+      const slot = findSlotByChunk(chunkIndex);
+      if (slot && slot.worker) {
+        slot.worker.postMessage({ type: "cancel", chunkIndex });
+      }
     },
 
     isBusy(): boolean {
-      return busy;
+      return slots.every((s) => s.busy || !s.worker);
+    },
+
+    hasCapacity(): boolean {
+      return findFreeSlot() !== null;
     },
 
     getCurrentChunkIndex(): number | null {
-      return currentChunkIndex;
+      // Return the first busy slot's chunk index for backwards compat
+      for (const slot of slots) {
+        if (slot.busy && slot.currentChunkIndex !== null) {
+          return slot.currentChunkIndex;
+        }
+      }
+      return null;
     },
 
     getLastPostTime(): number | null {
-      return lastPostTime;
+      // Return the most recent post time across all chunks
+      let latest: number | null = null;
+      for (const t of postTimes.values()) {
+        if (latest === null || t > latest) {
+          latest = t;
+        }
+      }
+      return latest;
+    },
+
+    getPostTimeForChunk(chunkIndex: number): number | null {
+      return postTimes.get(chunkIndex) ?? null;
     },
 
     terminate(): void {
       if (terminated) return;
       terminated = true;
-      if (worker) {
-        worker.onmessage = null;
-        worker.onerror = null;
-        worker.terminate();
-        worker = null;
+      for (const slot of slots) {
+        if (slot.worker) {
+          slot.worker.onmessage = null;
+          slot.worker.onerror = null;
+          slot.worker.terminate();
+          slot.worker = null;
+        }
       }
       if (workerURL) {
         revokeWorkerURL(workerURL);
         workerURL = null;
       }
+      postTimes.clear();
     },
   };
 }

@@ -72,43 +72,44 @@ export function createConversionScheduler(
       }
     }
 
-    // Cancel current conversion if it's too far from playhead
-    if (workerManager.isBusy()) {
-      const currentConvertIdx = workerManager.getCurrentChunkIndex();
-      if (currentConvertIdx !== null) {
-        const dist = Math.abs(currentConvertIdx - playheadIndex);
+    // Cancel converting chunks that are too far from playhead
+    for (const chunk of chunks) {
+      if (chunk.state === "converting") {
+        const dist = Math.abs(chunk.index - playheadIndex);
         if (dist > cancelDistThreshold) {
-          workerManager.cancelCurrent();
+          workerManager.cancelChunk(chunk.index);
         }
       }
     }
   }
 
   function dispatchNext(): void {
-    if (disposed || workerManager.isBusy()) return;
+    if (disposed) return;
 
-    let nextChunk = queue.dequeue();
-    while (nextChunk && nextChunk.state === "ready") {
-      nextChunk = queue.dequeue();
+    while (workerManager.hasCapacity()) {
+      let nextChunk = queue.dequeue();
+      while (nextChunk && nextChunk.state === "ready") {
+        nextChunk = queue.dequeue();
+      }
+      if (!nextChunk) return;
+
+      if (
+        nextChunk.state !== "queued" &&
+        nextChunk.state !== "pending" &&
+        nextChunk.state !== "failed"
+      ) {
+        continue;
+      }
+
+      nextChunk.state = "converting";
+      const data = extractChunkData(nextChunk.index);
+      workerManager.postConvert(
+        nextChunk.index,
+        data,
+        currentTempo,
+        sampleRate,
+      );
     }
-    if (!nextChunk) return;
-
-    if (
-      nextChunk.state !== "queued" &&
-      nextChunk.state !== "pending" &&
-      nextChunk.state !== "failed"
-    ) {
-      return;
-    }
-
-    nextChunk.state = "converting";
-    const data = extractChunkData(nextChunk.index);
-    workerManager.postConvert(
-      nextChunk.index,
-      data,
-      currentTempo,
-      sampleRate,
-    );
   }
 
   function handleResult(
@@ -142,11 +143,14 @@ export function createConversionScheduler(
   }
 
   function handleSeek(newChunkIndex: number): void {
-    const oldIndex = currentChunkIdx;
-    const dist = Math.abs(newChunkIndex - oldIndex);
-
-    if (dist > cancelDistThreshold && workerManager.isBusy()) {
-      workerManager.cancelCurrent();
+    // Cancel converting chunks that are far from the new playhead
+    for (const chunk of chunks) {
+      if (chunk.state === "converting") {
+        const dist = Math.abs(chunk.index - newChunkIndex);
+        if (dist > cancelDistThreshold) {
+          workerManager.cancelChunk(chunk.index);
+        }
+      }
     }
 
     updatePriorities(newChunkIndex);
@@ -165,10 +169,8 @@ export function createConversionScheduler(
 
     currentTempo = newTempo;
 
-    // Cancel current conversion
-    if (workerManager.isBusy()) {
-      workerManager.cancelCurrent();
-    }
+    // Cancel all current conversions
+    workerManager.cancelCurrent();
 
     // Reset all chunks (except evicted)
     for (const chunk of chunks) {
@@ -202,10 +204,8 @@ export function createConversionScheduler(
 
     previousTempoCache = null;
 
-    // Cancel current and re-evaluate remaining
-    if (workerManager.isBusy()) {
-      workerManager.cancelCurrent();
-    }
+    // Cancel all current conversions and re-evaluate remaining
+    workerManager.cancelCurrent();
 
     updatePriorities(currentChunkIdx);
     dispatchNext();
