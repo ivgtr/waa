@@ -12,6 +12,8 @@ BYO AudioContext / Zero Dependencies / Framework-agnostic / Sample-accurate
 
 既存のオーディオライブラリは独自の AudioContext を内部で抱えていたり、フレームワークに依存していたりして、ちょっとした音声再生をしたいだけなのに大げさになりがちです。waa は「AudioContext は自分で持ってきてね」というスタンスで、必要な関数だけ import して組み合わせて使えるようにしています。
 
+再生速度を変えてもピッチを維持するタイムストレッチ（WSOLA）も入っています。音声をチャンクに分割して Web Worker で並列処理するので、長い音源でも再生開始までの待ちが短くなります。
+
 ## Features
 
 - **BYO AudioContext** — AudioContext を外から渡す設計なので、他のライブラリとの共存も自由
@@ -20,6 +22,7 @@ BYO AudioContext / Zero Dependencies / Framework-agnostic / Sample-accurate
 - **Framework-agnostic** — React / Vue / Svelte / Vanilla JS どれでも同じ API
 - **Sample-accurate** — `AudioContext.currentTime` ベースの精密な再生位置追跡
 - **Tree-shakeable** — 使う関数だけがバンドルに入る
+- Pitch-preserving time-stretch — チャンク分割 + WSOLA で、再生速度を変えてもピッチを維持
 
 ## Install
 
@@ -68,7 +71,7 @@ import { extractPeaks } from "waa/waveform";
 | `scheduler` | 精密スケジューリングと BPM ベースの Clock |
 | `synth` | サイン波・ノイズ・クリック音のバッファ生成 |
 | `adapters` | React `useSyncExternalStore` / Vue / Svelte 向けのスナップショット連携 |
-| `stretcher` | WSOLA アルゴリズムによるピッチ保持タイムストレッチ |
+| `stretcher` | WSOLA によるピッチ保持タイムストレッチ。音声を 5 秒チャンクに分割し Worker で並列変換、ダブルバッファリング + クロスフェードでギャップレス再生 |
 
 ## Usage Examples
 
@@ -145,53 +148,6 @@ const ctx = Tone.context.rawContext;
 const buffer = await loadBuffer(ctx, "/audio/track.mp3");
 play(ctx, buffer);
 ```
-
-## Pitch-Preserving Playback
-
-`playbackRate` を変えると当然ピッチも変わります。「速度は変えたいけど声の高さはそのままがいい」というときのために、WSOLA ベースのタイムストレッチエンジンを内蔵しています。
-
-```ts
-const playback = play(ctx, buffer, {
-  preservePitch: true,
-  playbackRate: 1.5, // 1.5倍速、ピッチはそのまま
-});
-
-// あとからテンポ変更もできる
-playback.setPlaybackRate(0.75);
-```
-
-### しくみ
-
-普通に WSOLA を音声全体に適用すると、長い音源ほど変換待ちが発生します（60分の音源で数十秒とか）。これだと再生ボタンを押してから音が出るまでが長すぎるので、チャンク分割と組み合わせて遅延を抑えています。
-
-```
-音声バッファ (例: 60分)
-│
-├─ Chunk 0  [0:00 ~ 0:05]  ← まずここだけ変換して再生開始
-├─ Chunk 1  [0:05 ~ 0:10]  ← 裏で先読み変換
-├─ Chunk 2  [0:10 ~ 0:15]
-├─ ...
-└─ Chunk N  [最後まで]
-```
-
-1. **チャンク分割** — 音声を 5 秒ごとのチャンクに分割（チャンク間は 200ms のオーバーラップ付き）
-2. **WSOLA タイムストレッチ** — 各チャンクに対して WSOLA（Waveform Similarity Overlap-Add）を適用。Hann 窓 + 正規化相互相関でフレーム間の位相をそろえるので、ピッチを保ったまま伸縮できる
-3. **優先度付きスケジューリング** — 再生ヘッド付近のチャンクを優先的に変換。seek やテンポ変更があれば優先度を再計算
-4. **Web Worker 並列処理** — WSOLA の計算はワーカープール（デフォルト 2 スレッド）でメインスレッドをブロックしない
-5. **ギャップレス再生** — ダブルバッファリング + 10ms クロスフェードでチャンク間の継ぎ目を目立たなくする
-
-バッファの残量はヒステリシス付きで監視していて、先読みが足りなくなったら自動でバッファリング状態に入り、十分溜まったら復帰します。
-
-### パラメータ
-
-| 定数 | デフォルト | 説明 |
-|------|-----------|------|
-| `CHUNK_DURATION_SEC` | 5 | チャンクの長さ（秒） |
-| `OVERLAP_SEC` | 0.2 | チャンク間オーバーラップ（秒） |
-| `WSOLA_FRAME_SIZE` | 1024 | WSOLA の解析フレームサイズ |
-| `WSOLA_HOP_SIZE` | 512 | WSOLA のホップサイズ |
-| `WSOLA_TOLERANCE` | 2048 | 相互相関の探索範囲（サンプル数） |
-| `WORKER_POOL_SIZE` | 2 | ワーカースレッド数 |
 
 ## License
 
