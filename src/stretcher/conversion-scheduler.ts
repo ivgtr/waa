@@ -7,6 +7,11 @@ import {
   PRIORITY_BACKWARD_WEIGHT,
   CANCEL_DISTANCE_THRESHOLD,
   MAX_CHUNK_RETRIES,
+  KEEP_AHEAD_CHUNKS,
+  KEEP_AHEAD_SECONDS,
+  KEEP_BEHIND_CHUNKS,
+  KEEP_BEHIND_SECONDS,
+  CHUNK_DURATION_SEC,
 } from "./constants.js";
 import { createPriorityQueue } from "./priority-queue.js";
 import type {
@@ -38,6 +43,19 @@ export function createConversionScheduler(
   const backwardWeight = options?.backwardWeight ?? PRIORITY_BACKWARD_WEIGHT;
   const cancelDistThreshold =
     options?.cancelDistanceThreshold ?? CANCEL_DISTANCE_THRESHOLD;
+  const keepAhead = options?.keepAheadChunks ?? Math.max(
+    KEEP_AHEAD_CHUNKS,
+    Math.ceil(KEEP_AHEAD_SECONDS / CHUNK_DURATION_SEC),
+  );
+  const keepBehind = options?.keepBehindChunks ?? Math.max(
+    KEEP_BEHIND_CHUNKS,
+    Math.ceil(KEEP_BEHIND_SECONDS / CHUNK_DURATION_SEC),
+  );
+
+  function isInActiveWindow(chunkIndex: number, playheadIndex: number): boolean {
+    const dist = chunkIndex - playheadIndex;
+    return dist <= keepAhead && dist >= -keepBehind;
+  }
 
   let currentTempo = tempo;
   let currentChunkIdx = 0;
@@ -68,6 +86,11 @@ export function createConversionScheduler(
       ) {
         chunk.priority = calcPriority(chunk.index, playheadIndex);
         chunk.state = "queued";
+        queue.enqueue(chunk);
+      } else if (chunk.state === "evicted" && isInActiveWindow(chunk.index, playheadIndex)) {
+        chunk.state = "queued";
+        chunk.retryCount = 0;
+        chunk.priority = calcPriority(chunk.index, playheadIndex);
         queue.enqueue(chunk);
       }
     }
@@ -158,27 +181,32 @@ export function createConversionScheduler(
   }
 
   function handleTempoChange(newTempo: number): void {
-    // Save current results as previous tempo cache
+    // Save current results as previous tempo cache (window内のみ保持)
     previousTempoCache = {
       tempo: currentTempo,
-      chunks: chunks.map((c) => ({
-        outputBuffer: c.outputBuffer,
-        outputLength: c.outputLength,
-      })),
+      chunks: chunks.map((c) => {
+        if (isInActiveWindow(c.index, currentChunkIdx) && c.outputBuffer) {
+          return { outputBuffer: c.outputBuffer, outputLength: c.outputLength };
+        }
+        return { outputBuffer: null, outputLength: 0 };
+      }),
     };
 
     currentTempo = newTempo;
-
-    // Cancel all current conversions
     workerManager.cancelCurrent();
 
-    // Reset all chunks (except evicted)
     for (const chunk of chunks) {
-      if (chunk.state !== "evicted") {
+      if (chunk.state === "evicted") continue;
+
+      if (isInActiveWindow(chunk.index, currentChunkIdx)) {
         chunk.outputBuffer = null;
         chunk.outputLength = 0;
         chunk.state = "pending";
         chunk.retryCount = 0;
+      } else {
+        chunk.outputBuffer = null;
+        chunk.outputLength = 0;
+        chunk.state = "evicted";
       }
     }
 

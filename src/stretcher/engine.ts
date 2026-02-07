@@ -85,6 +85,10 @@ export function createStretcherEngine(
   let currentChunkIndex = 0;
   let bufferingResumePosition: number | null = null;
 
+  // Memory management window
+  const keepAhead = Math.max(KEEP_AHEAD_CHUNKS, Math.ceil(KEEP_AHEAD_SECONDS / CHUNK_DURATION_SEC));
+  const keepBehind = Math.max(KEEP_BEHIND_CHUNKS, Math.ceil(KEEP_BEHIND_SECONDS / CHUNK_DURATION_SEC));
+
   // Split buffer into chunks
   const chunks = splitIntoChunks(
     buffer.length,
@@ -151,7 +155,7 @@ export function createStretcherEngine(
     (chunkIndex: number) => extractChunkData(buffer, chunks[chunkIndex]!),
     sampleRate,
     currentTempo,
-    undefined,
+    { keepAheadChunks: keepAhead, keepBehindChunks: keepBehind },
     onChunkReady,
     onChunkFailed,
   ) as ReturnType<typeof createConversionScheduler>;
@@ -339,15 +343,6 @@ export function createStretcherEngine(
   // --- Memory management ---
 
   function evictDistantChunks(): void {
-    const keepAhead = Math.max(
-      KEEP_AHEAD_CHUNKS,
-      Math.ceil(KEEP_AHEAD_SECONDS / CHUNK_DURATION_SEC),
-    );
-    const keepBehind = Math.max(
-      KEEP_BEHIND_CHUNKS,
-      Math.ceil(KEEP_BEHIND_SECONDS / CHUNK_DURATION_SEC),
-    );
-
     for (const chunk of chunks) {
       if (chunk.state !== "ready") continue;
 

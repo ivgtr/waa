@@ -212,6 +212,150 @@ describe("createConversionScheduler", () => {
     scheduler.dispose();
   });
 
+  it("re-queues evicted chunks when they enter the active window", () => {
+    const chunks = makeChunks(20);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      { keepAheadChunks: 5, keepBehindChunks: 3 },
+    );
+
+    scheduler.start(0);
+
+    // Manually evict chunk 10
+    chunks[10]!.state = "evicted";
+    chunks[10]!.outputBuffer = null;
+    chunks[10]!.outputLength = 0;
+
+    // Move playhead near chunk 10 — it should be within the window
+    wm.simulateResult(0);
+    scheduler.handleSeek(10);
+
+    expect(chunks[10]!.state).not.toBe("evicted");
+
+    scheduler.dispose();
+  });
+
+  it("tempo change evicts chunks outside the active window", () => {
+    const chunks = makeChunks(50);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      { keepAheadChunks: 5, keepBehindChunks: 3 },
+    );
+
+    scheduler.start(10);
+
+    // Mark several chunks as ready
+    for (let i = 0; i < 50; i++) {
+      wm.simulateResult(i);
+      chunks[i]!.state = "ready";
+      chunks[i]!.outputBuffer = [new Float32Array(1024)];
+      chunks[i]!.outputLength = 1024;
+    }
+
+    scheduler.handleTempoChange(1.5);
+
+    // Window: [10-3, 10+5] = [7, 15]
+    // Chunks outside should be evicted
+    expect(chunks[0]!.state).toBe("evicted");
+    expect(chunks[6]!.state).toBe("evicted");
+    expect(chunks[16]!.state).toBe("evicted");
+    expect(chunks[49]!.state).toBe("evicted");
+
+    // Chunks inside should be pending/queued/converting (reset for re-conversion)
+    for (let i = 7; i <= 15; i++) {
+      expect(chunks[i]!.state).not.toBe("evicted");
+      expect(chunks[i]!.state).not.toBe("ready");
+    }
+
+    scheduler.dispose();
+  });
+
+  it("tempo cache only preserves window-internal chunks", () => {
+    const chunks = makeChunks(20);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      { keepAheadChunks: 3, keepBehindChunks: 2 },
+    );
+
+    scheduler.start(5);
+
+    // Mark all chunks as ready
+    const buf = [new Float32Array(1024)];
+    for (let i = 0; i < 20; i++) {
+      wm.simulateResult(i);
+      chunks[i]!.state = "ready";
+      chunks[i]!.outputBuffer = buf;
+      chunks[i]!.outputLength = 1024;
+    }
+
+    // Change tempo then restore
+    scheduler.handleTempoChange(2.0);
+    const restored = scheduler.restorePreviousTempo();
+    expect(restored).toBe(true);
+
+    // Window: [5-2, 5+3] = [3, 8]
+    // Only window-internal chunks should be restored to ready
+    for (let i = 3; i <= 8; i++) {
+      expect(chunks[i]!.state).toBe("ready");
+    }
+
+    // Chunks outside window should NOT be ready
+    expect(chunks[0]!.state).not.toBe("ready");
+    expect(chunks[15]!.state).not.toBe("ready");
+
+    scheduler.dispose();
+  });
+
+  it("evicted chunks outside the window are not re-queued", () => {
+    const chunks = makeChunks(30);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      { keepAheadChunks: 3, keepBehindChunks: 2 },
+    );
+
+    scheduler.start(5);
+
+    // Evict a distant chunk
+    chunks[25]!.state = "evicted";
+    chunks[25]!.outputBuffer = null;
+
+    // Update priorities without moving playhead near chunk 25
+    scheduler.updatePriorities(5);
+
+    // Chunk 25 should remain evicted
+    expect(chunks[25]!.state).toBe("evicted");
+
+    scheduler.dispose();
+  });
+
   it("calls onChunkReady callback", () => {
     const chunks = makeChunks(3);
     const wm = createMockWorkerManager();
