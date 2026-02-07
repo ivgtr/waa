@@ -13,6 +13,7 @@ export default defineConfig({
     scheduler: "src/scheduler.ts",
     synth: "src/synth.ts",
     adapters: "src/adapters.ts",
+    stretcher: "src/stretcher/index.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
