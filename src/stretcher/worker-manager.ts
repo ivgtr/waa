@@ -21,6 +21,7 @@ export function createWorkerManager(
   onError: (response: WorkerResponse) => void,
   maxCrashes: number = MAX_WORKER_CRASHES,
   poolSize: number = WORKER_POOL_SIZE,
+  onAllDead?: () => void,
 ): WorkerManager {
   let workerURL: string | null = null;
   let terminated = false;
@@ -35,11 +36,22 @@ export function createWorkerManager(
     return workerURL;
   }
 
+  function isAllDead(): boolean {
+    return slots.every((s) => s.worker === null);
+  }
+
   function spawnWorkerForSlot(slot: WorkerSlot): void {
     if (terminated) return;
 
     const url = ensureWorkerURL();
-    const worker = new Worker(url);
+    let worker: Worker;
+    try {
+      worker = new Worker(url);
+    } catch {
+      // Blob URL Worker not supported (e.g. iOS Safari 14-, strict CSP)
+      slot.worker = null;
+      return;
+    }
 
     worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       const response = e.data;
@@ -92,6 +104,9 @@ export function createWorkerManager(
           chunkIndex: failedChunkIndex ?? -1,
           error: `Worker crashed ${slot.crashCount} times, giving up`,
         });
+        if (isAllDead()) {
+          onAllDead?.();
+        }
       }
     };
 
@@ -108,6 +123,11 @@ export function createWorkerManager(
     };
     slots.push(slot);
     spawnWorkerForSlot(slot);
+  }
+
+  // If all Workers failed to spawn, notify immediately
+  if (isAllDead()) {
+    onAllDead?.();
   }
 
   function findFreeSlot(): WorkerSlot | null {

@@ -253,9 +253,9 @@ describe("playback lifecycle (chunk progression)", () => {
     expect(scheduledLen).toBe(CHUNK1_TRIMMED);
 
     // --- Transition setTimeout 発火 ---
-    // scheduleNext 内 transitionDelay = 0.3 * 1000 + 50 = 350ms
+    // scheduleNext 内 transitionDelay = (8.0 - 7.6) * 1000 + 50 = 450ms
     (ctx as any).currentTime = 8.0;
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(500);
 
     // Transition 後: chunk 0 source は stopped (onended=null), chunk 1 source が current
     const activeAfterTransition = findActiveSource();
@@ -292,9 +292,9 @@ describe("playback lifecycle (chunk progression)", () => {
     (ctx as any).currentTime = 7.6;
     vi.advanceTimersByTime(200);
 
-    // Transition
+    // Transition: transitionDelay = (8.0 - 7.6) * 1000 + 50 = 450ms
     (ctx as any).currentTime = 8.0;
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(500);
 
     // Chunk 1 ended
     const active = findActiveSource();
