@@ -91,6 +91,8 @@ export interface ConversionSchedulerOptions {
   forwardWeight: number;
   backwardWeight: number;
   cancelDistanceThreshold: number;
+  keepAheadChunks: number;
+  keepBehindChunks: number;
 }
 
 // ---------------------------------------------------------------------------
