@@ -13,7 +13,7 @@ import {
   extractPeakPairs,
   onFrame,
 } from "waa";
-import type { Playback, PeakPair } from "waa";
+import type { Playback, PeakPair, StretcherSnapshotExtension } from "waa";
 
 // ---------------------------------------------------------------------------
 // DOM Elements
@@ -48,6 +48,14 @@ const volumeInput = $<HTMLInputElement>("volume");
 const panInput = $<HTMLInputElement>("pan");
 const speedSelect = $<HTMLSelectElement>("speed");
 const loopCheckbox = $<HTMLInputElement>("loop");
+const preservePitchCheckbox = $<HTMLInputElement>("preserve-pitch");
+
+const stretcherStatus = $("stretcher-status");
+const stretcherProgressFill = $("stretcher-progress-fill");
+const stretcherBuffering = $("stretcher-buffering");
+const bufferHealthDot = $("buffer-health");
+const stretcherDetail = $("stretcher-detail");
+const waveformBufferBar = $("waveform-buffer-bar");
 
 const visualizerSection = $("visualizer-section");
 const visualizerCanvas = $<HTMLCanvasElement>("visualizer-canvas");
@@ -203,6 +211,7 @@ function loadAudio(buffer: AudioBuffer) {
 
   // Reset transport state
   setTransportState("stopped");
+  updateStretcherVisibility();
 }
 
 function drawWaveform(pairs: PeakPair[]) {
@@ -280,13 +289,17 @@ btnPlayPause.addEventListener("click", async () => {
     stopFrameLoop();
   }
 
+  const usePitchPreserve = preservePitchCheckbox.checked;
+
   currentPlayback = play(audioCtx, currentBuffer, {
     through: [gainNode!],
-    loop: loopCheckbox.checked,
+    loop: usePitchPreserve ? false : loopCheckbox.checked,
     playbackRate: Number(speedSelect.value),
+    preservePitch: usePitchPreserve,
   });
 
   setTransportState("playing");
+  updateStretcherVisibility();
 
   // Frame loop for visualizer + cursor updates
   stopFrameLoop = onFrame(currentPlayback, (snapshot) => {
@@ -303,10 +316,14 @@ btnPlayPause.addEventListener("click", async () => {
     } else if (snapshot.state === "paused") {
       setTransportState("paused");
     }
+
+    // Update stretcher UI
+    updateStretcherUI(snapshot.stretcher);
   });
 
   currentPlayback.on("ended", () => {
     setTransportState("stopped");
+    updateStretcherVisibility();
     waveformCursor.style.left = "0%";
     timeCurrent.textContent = formatTime(0);
   });
@@ -316,6 +333,7 @@ btnStop.addEventListener("click", () => {
   if (currentPlayback) {
     currentPlayback.stop();
     setTransportState("stopped");
+    updateStretcherVisibility();
     waveformCursor.style.left = "0%";
     timeCurrent.textContent = formatTime(0);
   }
@@ -346,6 +364,16 @@ speedSelect.addEventListener("change", () => {
 loopCheckbox.addEventListener("change", () => {
   if (currentPlayback) {
     currentPlayback.setLoop(loopCheckbox.checked);
+  }
+});
+
+// Preserve Pitch <-> Loop 連動
+preservePitchCheckbox.addEventListener("change", () => {
+  if (preservePitchCheckbox.checked) {
+    loopCheckbox.checked = false;
+    loopCheckbox.disabled = true;
+  } else {
+    loopCheckbox.disabled = false;
   }
 });
 
@@ -394,6 +422,47 @@ function drawVisualizer() {
 
 // Initial canvas resize
 resizeVisualizerCanvas();
+
+// ---------------------------------------------------------------------------
+// Stretcher UI Helpers
+// ---------------------------------------------------------------------------
+
+function updateStretcherVisibility() {
+  const isActive =
+    preservePitchCheckbox.checked &&
+    currentPlayback &&
+    currentPlayback.getState() !== "stopped";
+  stretcherStatus.hidden = !isActive;
+  if (!isActive) {
+    waveformBufferBar.style.width = "0%";
+  }
+}
+
+function updateStretcherUI(snap: StretcherSnapshotExtension | undefined) {
+  if (!snap) {
+    stretcherStatus.hidden = true;
+    waveformBufferBar.style.width = "0%";
+    return;
+  }
+
+  stretcherStatus.hidden = false;
+
+  // Progress bar
+  stretcherProgressFill.style.width = `${(snap.conversionProgress * 100).toFixed(1)}%`;
+
+  // Buffer health dot
+  bufferHealthDot.className = `buffer-health buffer-${snap.bufferHealth}`;
+
+  // Detail text
+  const pct = (snap.conversionProgress * 100).toFixed(0);
+  stretcherDetail.textContent = `${pct}% converted | ahead: ${snap.aheadSeconds.toFixed(1)}s`;
+
+  // Buffering indicator
+  stretcherBuffering.hidden = !snap.buffering;
+
+  // Waveform buffer bar
+  waveformBufferBar.style.width = `${(snap.conversionProgress * 100).toFixed(1)}%`;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
