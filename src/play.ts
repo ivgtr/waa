@@ -30,7 +30,7 @@ export function play(
   buffer: AudioBuffer,
   options?: PlayOptions,
 ): Playback {
-  const { preservePitch = false } = options ?? {};
+  const { preservePitch = true } = options ?? {};
 
   // ----- Pitch-preserving mode (WSOLA-based time-stretch) -----
   if (preservePitch) {

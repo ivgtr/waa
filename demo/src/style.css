@@ -446,11 +446,90 @@ header h1 {
   position: absolute;
   top: 0;
   left: 0;
+  width: 100%;
   height: 100%;
-  background: rgba(99, 102, 241, 0.1);
+  display: flex;
   pointer-events: none;
   z-index: 1;
-  transition: width 0.3s ease;
+}
+
+.waveform-buffer-block {
+  flex: 1;
+  min-width: 0;
+  opacity: 0.15;
+  transition: background-color 0.2s ease;
+}
+
+.wb-pending    { background-color: #3f3f46; }
+.wb-queued     { background-color: #a16207; }
+.wb-converting { background-color: #6366f1; animation: chunk-pulse 1s ease-in-out infinite; }
+.wb-ready      { background-color: #22c55e; }
+.wb-evicted    { background-color: #27272a; }
+.wb-failed     { background-color: #ef4444; }
+.wb-skipped    { background-color: #52525b; }
+
+/* ── Chunk Strip ─────────────────────────────────────────────── */
+
+.chunk-strip {
+  margin-top: 0.25rem;
+}
+
+.chunk-strip-blocks {
+  display: flex;
+  height: 16px;
+  gap: 1px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.chunk-block {
+  flex: 1;
+  min-width: 0;
+  transition: background-color 0.2s ease;
+}
+
+.chunk-pending {
+  background-color: #3f3f46;
+}
+
+.chunk-queued {
+  background-color: #a16207;
+}
+
+.chunk-converting {
+  background-color: #6366f1;
+  animation: chunk-pulse 1s ease-in-out infinite;
+}
+
+.chunk-ready {
+  background-color: #22c55e;
+}
+
+.chunk-evicted {
+  background-color: #27272a;
+}
+
+.chunk-failed {
+  background-color: #ef4444;
+}
+
+.chunk-skipped {
+  background-color: #52525b;
+}
+
+.chunk-playhead {
+  outline: 2px solid #fff;
+  outline-offset: -1px;
+  z-index: 1;
+}
+
+.chunk-in-window {
+  border-bottom: 2px solid var(--accent);
+}
+
+@keyframes chunk-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* ── Visualizer ──────────────────────────────────────────────── */

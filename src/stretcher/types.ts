@@ -160,6 +160,12 @@ export interface StretcherSnapshotExtension {
   bufferHealth: BufferHealth;
   aheadSeconds: number;
   buffering: boolean;
+  chunkStates: ChunkState[];
+  currentChunkIndex: number;
+  activeWindowStart: number;
+  activeWindowEnd: number;
+  totalChunks: number;
+  windowConversionProgress: number;
 }
 
 /** Events emitted by the stretcher engine. */
