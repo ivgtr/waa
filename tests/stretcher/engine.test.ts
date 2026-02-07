@@ -201,6 +201,44 @@ describe("createStretcherEngine", () => {
     engine.dispose(); // Double dispose should be safe
   });
 
+  it("setTempo で buffering 中の位置がバッファリング前の位置を返す", () => {
+    const ctx = createMockAudioContext();
+    const buffer = createMockAudioBuffer(60);
+
+    const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
+    engine.start();
+
+    // start() 直後は buffering 状態で、位置は offset(=0)
+    expect(engine.getStatus().phase).toBe("buffering");
+    const posBeforeTempo = engine.getCurrentPosition();
+
+    // tempo 変更 → buffering に再入
+    engine.setTempo(2.0);
+
+    expect(engine.getStatus().phase).toBe("buffering");
+    // バッファリング中の位置は tempo 変更前に保存した位置と同じ
+    expect(engine.getCurrentPosition()).toBe(posBeforeTempo);
+
+    engine.dispose();
+  });
+
+  it("seek でバッファリングに入った場合、位置が seek 先の位置を返す", () => {
+    const ctx = createMockAudioContext();
+    const buffer = createMockAudioBuffer(60);
+
+    const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
+    engine.start();
+
+    // seek to 30 seconds — chunk は未変換なので buffering に入る
+    engine.seek(30);
+
+    expect(engine.getStatus().phase).toBe("buffering");
+    // バッファリング中の位置は seek 先の位置を返す
+    expect(engine.getCurrentPosition()).toBe(30);
+
+    engine.dispose();
+  });
+
   it("event subscription and unsubscription works", () => {
     const ctx = createMockAudioContext();
     const buffer = createMockAudioBuffer(60);

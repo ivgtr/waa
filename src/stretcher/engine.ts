@@ -46,6 +46,7 @@ export function createStretcherEngine(
   let disposed = false;
   let bufferingStartTime = 0;
   let currentChunkIndex = 0;
+  let bufferingResumePosition: number | null = null;
 
   // Split buffer into chunks
   const chunks = splitIntoChunks(
@@ -145,11 +146,8 @@ export function createStretcherEngine(
     emitProgress();
     emitBufferHealth();
 
-    // If we're waiting or buffering and the needed chunk is ready, start/resume
-    if (
-      (phase === "waiting" || phase === "buffering") &&
-      chunkIndex === currentChunkIndex
-    ) {
+    // If we're waiting or buffering and enough chunks are ready, start/resume
+    if (phase === "waiting" || phase === "buffering") {
       if (monitor.shouldExitBuffering(currentChunkIndex, chunks)) {
         exitBuffering();
       }
@@ -224,6 +222,9 @@ export function createStretcherEngine(
     if (chunk && chunk.state === "ready") {
       playCurrentChunk();
     } else {
+      const nextChunk = chunks[currentChunkIndex]!;
+      const nominalStartSample = nextChunk.inputStartSample + nextChunk.overlapBefore;
+      bufferingResumePosition = nominalStartSample / sampleRate;
       enterBuffering("underrun");
     }
 
@@ -246,7 +247,22 @@ export function createStretcherEngine(
     const stallDuration = performance.now() - bufferingStartTime;
     phase = "playing";
     emitter.emit("buffered", { stallDuration });
-    playCurrentChunk();
+
+    if (bufferingResumePosition !== null) {
+      const chunk = chunks[currentChunkIndex];
+      if (chunk) {
+        const nominalStartSample = chunk.inputStartSample + chunk.overlapBefore;
+        const nominalStartSec = nominalStartSample / sampleRate;
+        const offsetInOriginal = bufferingResumePosition - nominalStartSec;
+        const offsetInOutput = Math.max(0, offsetInOriginal / currentTempo);
+        playCurrentChunk(offsetInOutput);
+      } else {
+        playCurrentChunk();
+      }
+      bufferingResumePosition = null;
+    } else {
+      playCurrentChunk();
+    }
   }
 
   // --- Memory management ---
@@ -295,6 +311,9 @@ export function createStretcherEngine(
   function getPositionInOriginalBuffer(): number {
     if (phase === "ended") return totalDuration;
     if (phase === "waiting") return offset;
+    if (phase === "buffering" && bufferingResumePosition !== null) {
+      return bufferingResumePosition;
+    }
 
     const chunk = chunks[currentChunkIndex];
     if (!chunk) return 0;
@@ -363,6 +382,7 @@ export function createStretcherEngine(
     if (disposed) return;
 
     currentChunkIndex = getChunkIndexForTime(chunks, offset, sampleRate);
+    bufferingResumePosition = offset;
     phase = "waiting";
     enterBuffering("initial");
 
@@ -415,6 +435,7 @@ export function createStretcherEngine(
         }
       }
     } else {
+      bufferingResumePosition = clamped;
       enterBuffering("seek");
     }
   }
@@ -427,6 +448,7 @@ export function createStretcherEngine(
 
   function setTempo(newTempo: number): void {
     if (disposed || newTempo === currentTempo) return;
+    bufferingResumePosition = getPositionInOriginalBuffer();
     currentTempo = newTempo;
     enterBuffering("tempo-change");
     scheduler.handleTempoChange(newTempo);
