@@ -282,6 +282,7 @@ function createStretchedPlayback(
   let timerId: ReturnType<typeof setInterval> | null = null;
   let disposed = false;
   let currentRate = initialRate;
+  let pendingSeek: number | null = null;
 
   // Emit initial play event
   emitter.emit("statechange", { state: "playing" });
@@ -331,6 +332,12 @@ function createStretchedPlayback(
     engineInstance.start();
     startTimer();
 
+    // Apply pending seek if any
+    if (pendingSeek !== null) {
+      engineInstance.seek(pendingSeek);
+      pendingSeek = null;
+    }
+
     // If we were paused before the engine loaded, pause it
     if (state === "paused") {
       engineInstance.pause();
@@ -358,6 +365,9 @@ function createStretchedPlayback(
   }
 
   function getCurrentTime(): number {
+    if (pendingSeek !== null) {
+      return pendingSeek;
+    }
     if (engineInstance) {
       return engineInstance.getCurrentPosition();
     }
@@ -390,7 +400,11 @@ function createStretchedPlayback(
   function seek(position: number) {
     if (disposed) return;
     const clamped = Math.max(0, Math.min(position, duration));
-    engineInstance?.seek(clamped);
+    if (engineInstance) {
+      engineInstance.seek(clamped);
+    } else {
+      pendingSeek = clamped;
+    }
     emitter.emit("seek", { position: clamped });
   }
 
