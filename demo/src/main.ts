@@ -56,6 +56,8 @@ const stretcherBuffering = $("stretcher-buffering");
 const bufferHealthDot = $("buffer-health");
 const stretcherDetail = $("stretcher-detail");
 const waveformBufferBar = $("waveform-buffer-bar");
+const chunkStrip = $("chunk-strip");
+const chunkStripBlocks = $("chunk-strip-blocks");
 
 const visualizerSection = $("visualizer-section");
 const visualizerCanvas = $<HTMLCanvasElement>("visualizer-canvas");
@@ -368,6 +370,9 @@ loopCheckbox.addEventListener("change", () => {
   }
 });
 
+// preservePitch が初期 checked なので loop を初期 disabled に
+loopCheckbox.disabled = preservePitchCheckbox.checked;
+
 // Preserve Pitch <-> Loop 連動
 preservePitchCheckbox.addEventListener("change", () => {
   if (preservePitchCheckbox.checked) {
@@ -434,35 +439,85 @@ function updateStretcherVisibility() {
     currentPlayback &&
     currentPlayback.getState() !== "stopped";
   stretcherStatus.hidden = !isActive;
+  chunkStrip.hidden = !isActive;
   if (!isActive) {
-    waveformBufferBar.style.width = "0%";
+    waveformBufferBar.innerHTML = "";
   }
 }
 
 function updateStretcherUI(snap: StretcherSnapshotExtension | undefined) {
   if (!snap) {
     stretcherStatus.hidden = true;
-    waveformBufferBar.style.width = "0%";
+    chunkStrip.hidden = true;
+    waveformBufferBar.innerHTML = "";
     return;
   }
 
   stretcherStatus.hidden = false;
+  chunkStrip.hidden = false;
 
-  // Progress bar
-  stretcherProgressFill.style.width = `${(snap.conversionProgress * 100).toFixed(1)}%`;
+  // Progress bar (window-based)
+  stretcherProgressFill.style.width = `${(snap.windowConversionProgress * 100).toFixed(1)}%`;
 
   // Buffer health dot
   bufferHealthDot.className = `buffer-health buffer-${snap.bufferHealth}`;
 
-  // Detail text
-  const pct = (snap.conversionProgress * 100).toFixed(0);
-  stretcherDetail.textContent = `${pct}% converted | ahead: ${snap.aheadSeconds.toFixed(1)}s`;
+  // Detail text (window-based)
+  const pct = (snap.windowConversionProgress * 100).toFixed(0);
+  stretcherDetail.textContent = `window: ${pct}% | ahead: ${snap.aheadSeconds.toFixed(1)}s`;
 
   // Buffering indicator
   stretcherBuffering.hidden = !snap.buffering;
 
-  // Waveform buffer bar
-  waveformBufferBar.style.width = `${(snap.conversionProgress * 100).toFixed(1)}%`;
+  // Chunk strip visualization
+  renderChunkStrip(snap);
+}
+
+let prevTotalChunks = 0;
+
+function renderChunkStrip(snap: StretcherSnapshotExtension) {
+  const { chunkStates, currentChunkIndex: playhead, activeWindowStart, activeWindowEnd, totalChunks } = snap;
+
+  // Rebuild DOM elements only when totalChunks changes
+  if (totalChunks !== prevTotalChunks) {
+    prevTotalChunks = totalChunks;
+    chunkStripBlocks.innerHTML = "";
+    waveformBufferBar.innerHTML = "";
+    for (let i = 0; i < totalChunks; i++) {
+      const block = document.createElement("div");
+      block.className = "chunk-block chunk-pending";
+      chunkStripBlocks.appendChild(block);
+
+      const wbBlock = document.createElement("div");
+      wbBlock.className = "waveform-buffer-block wb-pending";
+      waveformBufferBar.appendChild(wbBlock);
+    }
+  }
+
+  // Update classes each frame
+  const blocks = chunkStripBlocks.children;
+  const wbBlocks = waveformBufferBar.children;
+  for (let i = 0; i < blocks.length; i++) {
+    const state = chunkStates[i] ?? "pending";
+
+    // Chunk strip
+    let cls = `chunk-block chunk-${state}`;
+    if (i >= activeWindowStart && i <= activeWindowEnd) {
+      cls += " chunk-in-window";
+    }
+    if (i === playhead) {
+      cls += " chunk-playhead";
+    }
+    if (blocks[i]!.className !== cls) {
+      blocks[i]!.className = cls;
+    }
+
+    // Waveform buffer overlay
+    const wbCls = `waveform-buffer-block wb-${state}`;
+    if (wbBlocks[i] && wbBlocks[i]!.className !== wbCls) {
+      wbBlocks[i]!.className = wbCls;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

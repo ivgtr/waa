@@ -58,9 +58,12 @@
         <section class="card" id="waveform-section" hidden>
           <h2>Waveform</h2>
           <div class="waveform-container">
-            <div id="waveform-buffer-bar" class="waveform-buffer-bar" style="width: 0%"></div>
+            <div id="waveform-buffer-bar" class="waveform-buffer-bar"></div>
             <canvas id="waveform-canvas"></canvas>
             <div id="waveform-cursor" class="waveform-cursor"></div>
+          </div>
+          <div id="chunk-strip" class="chunk-strip" hidden>
+            <div id="chunk-strip-blocks" class="chunk-strip-blocks"></div>
           </div>
           <div id="time-display" class="time-display">
             <span id="time-current">0:00.0</span>
@@ -106,7 +109,7 @@
                 Loop
               </label>
               <label class="control-label control-label-checkbox">
-                <input type="checkbox" id="preserve-pitch" />
+                <input type="checkbox" id="preserve-pitch" checked />
                 Preserve Pitch
               </label>
             </div>
