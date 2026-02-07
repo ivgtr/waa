@@ -6,8 +6,8 @@ function makeChunks(count: number): ChunkInfo[] {
   return Array.from({ length: count }, (_, i) => ({
     index: i,
     state: "pending" as const,
-    inputStartSample: i * 44100 * 30,
-    inputEndSample: (i + 1) * 44100 * 30,
+    inputStartSample: i * 44100 * 5,
+    inputEndSample: (i + 1) * 44100 * 5,
     overlapBefore: i === 0 ? 0 : 8820,
     overlapAfter: i === count - 1 ? 0 : 8820,
     outputBuffer: null,
@@ -20,6 +20,8 @@ function makeChunks(count: number): ChunkInfo[] {
 function createMockWorkerManager(): WorkerManager & {
   posted: Array<{ chunkIndex: number; tempo: number }>;
   cancelFn: ReturnType<typeof vi.fn>;
+  cancelChunkFn: ReturnType<typeof vi.fn>;
+  simulateResult(chunkIndex: number): void;
 } {
   let busy = false;
   let currentIdx: number | null = null;
@@ -28,18 +30,31 @@ function createMockWorkerManager(): WorkerManager & {
     busy = false;
     currentIdx = null;
   });
+  const cancelChunkFn = vi.fn((_chunkIndex: number) => {
+    busy = false;
+    currentIdx = null;
+  });
 
   return {
     posted,
     cancelFn,
+    cancelChunkFn,
+    simulateResult(_chunkIndex: number) {
+      busy = false;
+      currentIdx = null;
+    },
     postConvert(chunkIndex, _inputData, tempo, _sampleRate) {
       busy = true;
       currentIdx = chunkIndex;
       posted.push({ chunkIndex, tempo });
     },
     cancelCurrent: cancelFn,
+    cancelChunk: cancelChunkFn,
     isBusy: () => busy,
+    hasCapacity: () => !busy,
     getCurrentChunkIndex: () => currentIdx,
+    getLastPostTime: () => null,
+    getPostTimeForChunk: () => null,
     terminate() {
       busy = false;
       currentIdx = null;
@@ -85,8 +100,12 @@ describe("createConversionScheduler", () => {
 
     scheduler.start(0);
 
-    // Simulate completion of chunk 0
+    // Simulate Worker returning result for chunk 0
+    wm.simulateResult(0);
     (scheduler as any)._handleResult(0, [new Float32Array(1024)], 1024);
+
+    // Simulate Worker returning result for chunk 1 (dispatched by handleResult)
+    wm.simulateResult(1);
 
     // Seek to chunk 8
     scheduler.handleSeek(8);
@@ -115,9 +134,9 @@ describe("createConversionScheduler", () => {
     scheduler.start(0);
     expect(wm.isBusy()).toBe(true);
 
-    // Seek far away
+    // Seek far away — cancelChunk should be called for the converting chunk
     scheduler.handleSeek(8);
-    expect(wm.cancelFn).toHaveBeenCalled();
+    expect(wm.cancelChunkFn).toHaveBeenCalledWith(0);
 
     scheduler.dispose();
   });
@@ -138,6 +157,7 @@ describe("createConversionScheduler", () => {
     scheduler.start(0);
 
     // Mark chunk 0 as ready
+    wm.simulateResult(0);
     (scheduler as any)._handleResult(0, [new Float32Array(1024)], 1024);
     expect(chunks[0]!.state).toBe("ready");
 
@@ -169,8 +189,11 @@ describe("createConversionScheduler", () => {
 
     // Complete all chunks
     const buf = [new Float32Array(1024)];
+    wm.simulateResult(0);
     (scheduler as any)._handleResult(0, buf, 1024);
+    wm.simulateResult(1);
     (scheduler as any)._handleResult(1, buf, 1024);
+    wm.simulateResult(2);
     (scheduler as any)._handleResult(2, buf, 1024);
 
     // Change tempo
@@ -206,6 +229,7 @@ describe("createConversionScheduler", () => {
     );
 
     scheduler.start(0);
+    wm.simulateResult(0);
     (scheduler as any)._handleResult(0, [new Float32Array(1024)], 1024);
 
     expect(onReady).toHaveBeenCalledWith(0);

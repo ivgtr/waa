@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { createEmitter } from "../emitter.js";
-import { CHUNK_DURATION_SEC, OVERLAP_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS } from "./constants.js";
+import { CHUNK_DURATION_SEC, OVERLAP_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE } from "./constants.js";
 import { splitIntoChunks, extractChunkData, getChunkIndexForTime } from "./chunk-splitter.js";
 import { createWorkerManager } from "./worker-manager.js";
 import { createConversionScheduler } from "./conversion-scheduler.js";
@@ -63,13 +63,14 @@ export function createStretcherEngine(
   const monitor = createBufferMonitor();
 
   // Worker manager
+  const poolSize = options.workerPoolSize ?? WORKER_POOL_SIZE;
   const workerManager = createWorkerManager(
     (response: WorkerResponse) => {
       if (disposed) return;
       if (response.type === "result") {
         const chunk = chunks[response.chunkIndex];
         if (chunk) {
-          const postTime = workerManager.getLastPostTime();
+          const postTime = workerManager.getPostTimeForChunk(response.chunkIndex);
           const elapsed = postTime !== null ? performance.now() - postTime : 0;
           estimator.recordConversion(elapsed);
         }
@@ -96,6 +97,8 @@ export function createStretcherEngine(
         );
       }
     },
+    undefined,
+    poolSize,
   );
 
   // Conversion scheduler
