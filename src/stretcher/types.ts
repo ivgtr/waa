@@ -167,6 +167,7 @@ export interface StretcherEvents {
   buffered: { stallDuration: number };
   chunkready: { index: number };
   complete: void;
+  ended: void;
   error: { message: string; chunkIndex?: number; fatal: boolean };
 }
 

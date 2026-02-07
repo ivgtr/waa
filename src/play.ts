@@ -310,6 +310,14 @@ function createStretchedPlayback(
       emitter.emit("buffered", data);
     });
 
+    engineInstance.on("ended", () => {
+      if (disposed) return;
+      state = "stopped";
+      stopTimer();
+      emitter.emit("statechange", { state: "stopped" });
+      emitter.emit("ended", undefined as never);
+    });
+
     engineInstance.on("error", (data) => {
       if (disposed) return;
       if (data.fatal) {

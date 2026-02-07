@@ -209,6 +209,7 @@ export function createStretcherEngine(
       // Reached the end
       phase = "ended";
       chunkPlayer.stop();
+      emitter.emit("ended", undefined as never);
       emitter.emit("bufferhealth", {
         health: monitor.getHealth(currentChunkIndex, chunks),
         aheadSeconds: monitor.getAheadSeconds(currentChunkIndex, chunks),
