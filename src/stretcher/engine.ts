@@ -54,6 +54,10 @@ function trimOverlap(
   };
 }
 
+function getCrossfadeStart(chunk: ChunkInfo): number {
+  return chunk.overlapBefore > 0 ? CROSSFADE_SEC : 0;
+}
+
 /**
  * Create the stretcher engine that orchestrates all components.
  */
@@ -244,15 +248,14 @@ export function createStretcherEngine(
     return audioBuf;
   }
 
-  function playCurrentChunk(offsetInChunk: number = 0): void {
+  function playCurrentChunk(offsetInBuffer: number = 0): void {
     const chunk = chunks[currentChunkIndex];
     if (!chunk || chunk.state !== "ready" || !chunk.outputBuffer) return;
 
     const audioBuf = createAudioBufferFromChunk(chunk);
     if (!audioBuf) return;
 
-    const crossfadeStart = chunk.overlapBefore > 0 ? CROSSFADE_SEC : 0;
-    chunkPlayer.playChunk(audioBuf, ctx.currentTime, crossfadeStart + offsetInChunk);
+    chunkPlayer.playChunk(audioBuf, ctx.currentTime, offsetInBuffer);
   }
 
   function advanceToNextChunk(): void {
@@ -274,7 +277,7 @@ export function createStretcherEngine(
 
     const chunk = chunks[currentChunkIndex];
     if (chunk && chunk.state === "ready") {
-      playCurrentChunk();
+      playCurrentChunk(getCrossfadeStart(chunk));
     } else {
       const nextChunk = chunks[currentChunkIndex]!;
       const nominalStartSample = nextChunk.inputStartSample + nextChunk.overlapBefore;
@@ -320,12 +323,16 @@ export function createStretcherEngine(
           return;
         }
 
-        playCurrentChunk(offsetInOutput);
+        playCurrentChunk(getCrossfadeStart(chunk) + offsetInOutput);
       } else {
-        playCurrentChunk();
+        const cfChunk = chunks[currentChunkIndex];
+        const cfStart = cfChunk ? getCrossfadeStart(cfChunk) : 0;
+        playCurrentChunk(cfStart);
       }
     } else {
-      playCurrentChunk();
+      const chunk = chunks[currentChunkIndex];
+      const cfStart = chunk ? getCrossfadeStart(chunk) : 0;
+      playCurrentChunk(cfStart);
     }
   }
 
@@ -499,7 +506,9 @@ export function createStretcherEngine(
         phase = "playing";
         const audioBuf = createAudioBufferFromChunk(chunk);
         if (audioBuf) {
-          const clampedOffset = Math.min(Math.max(0, offsetInOutput), audioBuf.duration - 0.001);
+          const crossfadeStart = getCrossfadeStart(chunk);
+          const bufferOffset = crossfadeStart + offsetInOutput;
+          const clampedOffset = Math.min(Math.max(0, bufferOffset), audioBuf.duration - 0.001);
           chunkPlayer.handleSeek(audioBuf, clampedOffset);
         }
       }
