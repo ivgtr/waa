@@ -436,6 +436,13 @@ export function createStretcherEngine(
       (c) => c.state === "converting",
     ).length;
 
+    const windowStart = Math.max(0, currentChunkIndex - keepBehind);
+    const windowEnd = Math.min(total - 1, currentChunkIndex + keepAhead);
+    const windowSize = windowEnd - windowStart + 1;
+    const readyInWindow = chunks
+      .slice(windowStart, windowEnd + 1)
+      .filter((c) => c.state === "ready").length;
+
     return {
       tempo: currentTempo,
       converting: convertingCount > 0,
@@ -443,6 +450,12 @@ export function createStretcherEngine(
       bufferHealth: monitor.getHealth(currentChunkIndex, chunks),
       aheadSeconds: monitor.getAheadSeconds(currentChunkIndex, chunks),
       buffering: phase === "buffering" || phase === "waiting",
+      chunkStates: chunks.map((c) => c.state),
+      currentChunkIndex,
+      activeWindowStart: windowStart,
+      activeWindowEnd: windowEnd,
+      totalChunks: total,
+      windowConversionProgress: windowSize > 0 ? readyInWindow / windowSize : 0,
     };
   }
 

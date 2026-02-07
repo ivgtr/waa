@@ -38,7 +38,7 @@ export interface PlayOptions {
   /**
    * Enable pitch-preserving time-stretch via WSOLA.
    * When true, `playbackRate` controls tempo without changing pitch.
-   * @default false
+   * @default true
    */
   preservePitch?: boolean;
 }
@@ -55,6 +55,12 @@ export interface StretcherSnapshotExtension {
   bufferHealth: "healthy" | "low" | "critical" | "empty";
   aheadSeconds: number;
   buffering: boolean;
+  chunkStates: ("pending" | "queued" | "converting" | "ready" | "failed" | "skipped" | "evicted")[];
+  currentChunkIndex: number;
+  activeWindowStart: number;
+  activeWindowEnd: number;
+  totalChunks: number;
+  windowConversionProgress: number;
 }
 
 /** An immutable snapshot of a Playback's current state. */
