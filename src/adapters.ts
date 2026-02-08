@@ -4,28 +4,50 @@
 
 import type { Playback, PlaybackSnapshot } from "./types.js";
 
+const snapshotCache = new WeakMap<Playback, PlaybackSnapshot>();
+const subscriberCount = new WeakMap<Playback, number>();
+
+function computeSnapshot(playback: Playback): PlaybackSnapshot {
+  const state = playback.getState();
+  const position = playback.getCurrentTime();
+  const duration = playback.getDuration();
+  const progress = playback.getProgress();
+
+  const getter = (playback as unknown as Record<string, unknown>)["_getStretcherSnapshot"];
+  let stretcher: PlaybackSnapshot["stretcher"];
+  if (typeof getter === "function") {
+    stretcher = (getter as () => PlaybackSnapshot["stretcher"])();
+  }
+
+  const snap: PlaybackSnapshot = { state, position, duration, progress };
+  if (stretcher) {
+    snap.stretcher = stretcher;
+  }
+  return snap;
+}
+
 /**
  * Get an immutable snapshot of the current playback state.
  * Designed for use with React's `useSyncExternalStore` or similar patterns.
+ *
+ * When used with `subscribeSnapshot`, returns a referentially stable object
+ * that only updates when a playback event fires — satisfying the
+ * `useSyncExternalStore` contract. Without active subscribers, computes a
+ * fresh snapshot on every call (suitable for polling / `onFrame`).
  */
 export function getSnapshot(playback: Playback): PlaybackSnapshot {
-  const base: PlaybackSnapshot = {
-    state: playback.getState(),
-    position: playback.getCurrentTime(),
-    duration: playback.getDuration(),
-    progress: playback.getProgress(),
-  };
-
-  // Include stretcher snapshot if available (no static import required)
-  const getter = (playback as unknown as Record<string, unknown>)["_getStretcherSnapshot"];
-  if (typeof getter === "function") {
-    const stretcher = (getter as () => PlaybackSnapshot["stretcher"])();
-    if (stretcher) {
-      base.stretcher = stretcher;
-    }
+  // With active subscribers, return the event-driven cached snapshot
+  // to guarantee referential stability between events.
+  const subs = subscriberCount.get(playback) ?? 0;
+  if (subs > 0) {
+    const cached = snapshotCache.get(playback);
+    if (cached) return cached;
   }
 
-  return base;
+  // No subscribers (standalone / polling): compute fresh and cache.
+  const snap = computeSnapshot(playback);
+  snapshotCache.set(playback, snap);
+  return snap;
 }
 
 /**
@@ -47,15 +69,35 @@ export function subscribeSnapshot(
   playback: Playback,
   callback: () => void,
 ): () => void {
-  const unsubs: Array<() => void> = [];
+  const count = (subscriberCount.get(playback) ?? 0) + 1;
+  subscriberCount.set(playback, count);
 
-  unsubs.push(playback.on("statechange", callback));
-  unsubs.push(playback.on("timeupdate", callback));
-  unsubs.push(playback.on("seek", callback));
-  unsubs.push(playback.on("ended", callback));
+  // Eagerly compute the initial snapshot so getSnapshot() has a
+  // stable reference before the first event fires.
+  snapshotCache.set(playback, computeSnapshot(playback));
+
+  const notify = () => {
+    // Pre-compute and cache the snapshot BEFORE notifying the
+    // subscriber. This ensures getSnapshot() returns the same
+    // reference during React's render and post-commit check.
+    snapshotCache.set(playback, computeSnapshot(playback));
+    callback();
+  };
+
+  const unsubs: Array<() => void> = [];
+  unsubs.push(playback.on("statechange", notify));
+  unsubs.push(playback.on("timeupdate", notify));
+  unsubs.push(playback.on("seek", notify));
+  unsubs.push(playback.on("ended", notify));
 
   return () => {
     for (const unsub of unsubs) unsub();
+    const c = (subscriberCount.get(playback) ?? 1) - 1;
+    if (c <= 0) {
+      subscriberCount.delete(playback);
+    } else {
+      subscriberCount.set(playback, c);
+    }
   };
 }
 
