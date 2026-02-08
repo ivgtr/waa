@@ -14,6 +14,9 @@ const { locale } = Astro.props;
   id="viz-demo"
   data-i18n-pause={t(locale, 'playback.pause')}
   data-i18n-play={t(locale, 'playback.play')}
+  data-i18n-loading={t(locale, 'source.loading')}
+  data-i18n-load-failed={t(locale, 'source.load-failed')}
+  data-i18n-load-file={t(locale, 'source.load-file')}
 >
   <!-- Sound Source -->
   <section class="card">
@@ -34,8 +37,22 @@ const { locale } = Astro.props;
             <input type="range" id="viz-synth-freq" min="50" max="2000" value="440" />
             <span id="viz-synth-freq-val" class="range-value">440 Hz</span>
           </label>
+          <label class="synth-label">
+            <span class="label-text">{t(locale, 'source.duration')}</span>
+            <input type="range" id="viz-synth-dur" min="1" max="10" step="0.5" value="3" />
+            <span id="viz-synth-dur-val" class="range-value">3.0 s</span>
+          </label>
         </div>
         <button id="viz-btn-generate" class="btn btn-primary">{t(locale, 'source.generate')}</button>
+      </div>
+      <div class="divider">{t(locale, 'source.or')}</div>
+      <div class="file-controls">
+        <label class="btn btn-secondary file-label" id="viz-file-label">
+          <svg class="file-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span id="viz-file-label-text">{t(locale, 'source.load-file')}</span>
+          <input type="file" id="viz-file-input" accept="audio/*" hidden />
+        </label>
+        <span id="viz-file-name" class="file-name"></span>
       </div>
     </div>
   </section>
@@ -74,19 +91,20 @@ const { locale } = Astro.props;
 
 <script>
   import { getSharedPlayer } from '../../demo/shared-player';
+  import { initI18nStrings, drawWaveform, setTransportState, setupFileInputHandler, generateSynthBuffer } from '../../demo/demo-utils';
+  import type { TransportElements } from '../../demo/demo-utils';
   import type { Playback, PeakPair } from 'waa';
 
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
   const wrapper = document.getElementById('viz-demo') as HTMLElement;
-  const i18n = {
-    pause: wrapper?.dataset.i18nPause ?? 'Pause',
-    play: wrapper?.dataset.i18nPlay ?? 'Play',
-  };
+  const i18n = initI18nStrings(wrapper);
 
   const synthType = $<HTMLSelectElement>('viz-synth-type');
   const synthFreq = $<HTMLInputElement>('viz-synth-freq');
   const synthFreqVal = $('viz-synth-freq-val');
+  const synthDur = $<HTMLInputElement>('viz-synth-dur');
+  const synthDurVal = $('viz-synth-dur-val');
   const btnGenerate = $<HTMLButtonElement>('viz-btn-generate');
 
   const waveformSection = $('viz-waveform-section');
@@ -100,8 +118,12 @@ const { locale } = Astro.props;
 
   const btnPlay = $<HTMLButtonElement>('viz-btn-play');
   const btnStop = $<HTMLButtonElement>('viz-btn-stop');
-  const iconPlay = btnPlay.querySelector('.icon-play') as SVGElement;
-  const iconPause = btnPlay.querySelector('.icon-pause') as SVGElement;
+  const transport: TransportElements = {
+    btnPlayPause: btnPlay,
+    btnStop,
+    iconPlay: btnPlay.querySelector('.icon-play') as SVGElement,
+    iconPause: btnPlay.querySelector('.icon-pause') as SVGElement,
+  };
 
   const player = getSharedPlayer();
   let gainNode: GainNode | null = null;
@@ -119,21 +141,24 @@ const { locale } = Astro.props;
     }
   }
 
-  function setTransportState(state: 'stopped' | 'playing' | 'paused') {
-    btnPlay.dataset.state = state;
-    if (state === 'playing') {
-      iconPlay.setAttribute('hidden', '');
-      iconPause.removeAttribute('hidden');
-      btnStop.disabled = false;
-    } else {
-      iconPause.setAttribute('hidden', '');
-      iconPlay.removeAttribute('hidden');
-      btnStop.disabled = state === 'stopped';
-    }
+  function loadAudio(buffer: AudioBuffer) {
+    if (currentPlayback) { currentPlayback.dispose(); currentPlayback = null; }
+    if (stopFrameLoop) { stopFrameLoop(); stopFrameLoop = null; }
+    currentBuffer = buffer;
+    peaks = player.extractPeakPairs(buffer, { resolution: Number(resolutionInput.value) });
+    waveformSection.hidden = false;
+    freqSection.hidden = false;
+    drawWaveform(waveformCanvas, peaks);
+    resizeFreqCanvas();
+    setTransportState('stopped', transport, i18n);
   }
 
   synthFreq.addEventListener('input', () => {
     synthFreqVal.textContent = `${synthFreq.value} Hz`;
+  });
+
+  synthDur.addEventListener('input', () => {
+    synthDurVal.textContent = `${Number(synthDur.value).toFixed(1)} s`;
   });
 
   resolutionInput.addEventListener('input', () => {
@@ -141,45 +166,28 @@ const { locale } = Astro.props;
     resolutionVal.textContent = `${res}`;
     if (currentBuffer) {
       peaks = player.extractPeakPairs(currentBuffer, { resolution: res });
-      drawWaveform(peaks);
+      drawWaveform(waveformCanvas, peaks);
     }
   });
 
   btnGenerate.addEventListener('click', async () => {
     await player.ensureRunning();
     initNodes();
-    const freq = Number(synthFreq.value);
-    const type = synthType.value;
-    let buffer: AudioBuffer;
-    switch (type) {
-      case 'noise': buffer = player.createNoiseBuffer(3); break;
-      case 'click': buffer = player.createClickBuffer(freq, 3); break;
-      default: buffer = player.createSineBuffer(freq, 3);
-    }
-    currentBuffer = buffer;
-    peaks = player.extractPeakPairs(buffer, { resolution: Number(resolutionInput.value) });
-    waveformSection.hidden = false;
-    freqSection.hidden = false;
-    drawWaveform(peaks);
-    resizeFreqCanvas();
-    setTransportState('stopped');
+    const buffer = generateSynthBuffer(player, synthType.value, Number(synthFreq.value), Number(synthDur.value));
+    loadAudio(buffer);
   });
 
-  function drawWaveform(pairs: PeakPair[]) {
-    const rect = waveformCanvas.parentElement!.getBoundingClientRect();
-    waveformCanvas.width = rect.width * devicePixelRatio;
-    waveformCanvas.height = rect.height * devicePixelRatio;
-    const c = waveformCanvas.getContext('2d')!;
-    c.scale(devicePixelRatio, devicePixelRatio);
-    const w = rect.width, h = rect.height, mid = h / 2;
-    const barWidth = w / pairs.length;
-    c.clearRect(0, 0, w, h);
-    for (let i = 0; i < pairs.length; i++) {
-      const { min, max } = pairs[i]!;
-      c.fillStyle = 'rgba(99, 102, 241, 0.6)';
-      c.fillRect(i * barWidth, mid - max * mid, barWidth - 0.5, (max - min) * mid);
-    }
-  }
+  setupFileInputHandler(
+    player, i18n,
+    {
+      fileInput: $<HTMLInputElement>('viz-file-input'),
+      fileLabel: $('viz-file-label'),
+      fileLabelText: $('viz-file-label-text'),
+      fileName: $('viz-file-name'),
+    },
+    initNodes,
+    loadAudio,
+  );
 
   function resizeFreqCanvas() {
     const rect = freqCanvas.parentElement!.getBoundingClientRect();
@@ -210,7 +218,7 @@ const { locale } = Astro.props;
   }
 
   window.addEventListener('resize', () => {
-    if (peaks.length > 0) drawWaveform(peaks);
+    if (peaks.length > 0) drawWaveform(waveformCanvas, peaks);
     resizeFreqCanvas();
   });
 
@@ -220,12 +228,12 @@ const { locale } = Astro.props;
     if (!currentBuffer) return;
     if (currentPlayback && currentPlayback.getState() === 'playing') {
       currentPlayback.pause();
-      setTransportState('paused');
+      setTransportState('paused', transport, i18n);
       return;
     }
     if (currentPlayback && currentPlayback.getState() === 'paused') {
       currentPlayback.resume();
-      setTransportState('playing');
+      setTransportState('playing', transport, i18n);
       return;
     }
     if (currentPlayback) currentPlayback.dispose();
@@ -235,17 +243,17 @@ const { locale } = Astro.props;
       through: [gainNode!],
       loop: true,
     });
-    setTransportState('playing');
+    setTransportState('playing', transport, i18n);
 
     stopFrameLoop = player.onFrame(currentPlayback, (snapshot) => {
       waveformCursor.style.left = `${snapshot.progress * 100}%`;
       if (analyserNode) drawVisualizer();
-      if (snapshot.state === 'playing') setTransportState('playing');
-      else if (snapshot.state === 'paused') setTransportState('paused');
+      if (snapshot.state === 'playing') setTransportState('playing', transport, i18n);
+      else if (snapshot.state === 'paused') setTransportState('paused', transport, i18n);
     });
 
     currentPlayback.on('ended', () => {
-      setTransportState('stopped');
+      setTransportState('stopped', transport, i18n);
       waveformCursor.style.left = '0%';
     });
   });
@@ -253,7 +261,7 @@ const { locale } = Astro.props;
   btnStop.addEventListener('click', () => {
     if (currentPlayback) {
       currentPlayback.stop();
-      setTransportState('stopped');
+      setTransportState('stopped', transport, i18n);
       waveformCursor.style.left = '0%';
     }
   });

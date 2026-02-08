@@ -35,6 +35,11 @@ const { locale } = Astro.props;
             </select>
           </label>
           <label class="synth-label">
+            <span class="label-text">{t(locale, 'source.frequency')}</span>
+            <input type="range" id="tempo-synth-freq" min="50" max="2000" value="440" />
+            <span id="tempo-synth-freq-val" class="range-value">440 Hz</span>
+          </label>
+          <label class="synth-label">
             <span class="label-text">{t(locale, 'source.duration')}</span>
             <input type="range" id="tempo-synth-dur" min="1" max="10" step="0.5" value="5" />
             <span id="tempo-synth-dur-val" class="range-value">5.0 s</span>
@@ -119,27 +124,21 @@ const { locale } = Astro.props;
 
 <script>
   import { getSharedPlayer, formatTime } from '../../demo/shared-player';
+  import { initI18nStrings, drawWaveform, setTransportState, setupFileInputHandler, generateSynthBuffer } from '../../demo/demo-utils';
+  import type { TransportElements } from '../../demo/demo-utils';
   import type { Playback, PeakPair, StretcherSnapshotExtension } from 'waa';
 
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
   const wrapper = document.getElementById('tempo-demo') as HTMLElement;
-  const i18n = {
-    pause: wrapper?.dataset.i18nPause ?? 'Pause',
-    play: wrapper?.dataset.i18nPlay ?? 'Play',
-    loading: wrapper?.dataset.i18nLoading ?? 'Loading...',
-    loadFailed: wrapper?.dataset.i18nLoadFailed ?? 'Failed to load file',
-    loadFile: wrapper?.dataset.i18nLoadFile ?? 'Load Audio File',
-  };
+  const i18n = initI18nStrings(wrapper);
 
   const synthType = $<HTMLSelectElement>('tempo-synth-type');
+  const synthFreq = $<HTMLInputElement>('tempo-synth-freq');
+  const synthFreqVal = $('tempo-synth-freq-val');
   const synthDur = $<HTMLInputElement>('tempo-synth-dur');
   const synthDurVal = $('tempo-synth-dur-val');
   const btnGenerate = $<HTMLButtonElement>('tempo-btn-generate');
-  const fileInput = $<HTMLInputElement>('tempo-file-input');
-  const fileLabel = $('tempo-file-label');
-  const fileLabelText = $('tempo-file-label-text');
-  const fileName = $('tempo-file-name');
 
   const waveformSection = $('tempo-waveform-section');
   const waveformCanvas = $<HTMLCanvasElement>('tempo-waveform-canvas');
@@ -153,8 +152,12 @@ const { locale } = Astro.props;
   const playbackSection = $('tempo-playback-section');
   const btnPlay = $<HTMLButtonElement>('tempo-btn-play');
   const btnStop = $<HTMLButtonElement>('tempo-btn-stop');
-  const iconPlay = btnPlay.querySelector('.icon-play') as SVGElement;
-  const iconPause = btnPlay.querySelector('.icon-pause') as SVGElement;
+  const transport: TransportElements = {
+    btnPlayPause: btnPlay,
+    btnStop,
+    iconPlay: btnPlay.querySelector('.icon-play') as SVGElement,
+    iconPause: btnPlay.querySelector('.icon-pause') as SVGElement,
+  };
   const speedInput = $<HTMLInputElement>('tempo-speed');
   const speedVal = $('tempo-speed-val');
   const preservePitch = $<HTMLInputElement>('tempo-preserve-pitch');
@@ -176,19 +179,6 @@ const { locale } = Astro.props;
     if (!gainNode) {
       gainNode = player.createGain(0.8);
       player.chain(gainNode, player.ctx.destination);
-    }
-  }
-
-  function setTransportState(state: 'stopped' | 'playing' | 'paused') {
-    btnPlay.dataset.state = state;
-    if (state === 'playing') {
-      iconPlay.setAttribute('hidden', '');
-      iconPause.removeAttribute('hidden');
-      btnStop.disabled = false;
-    } else {
-      iconPause.setAttribute('hidden', '');
-      iconPlay.removeAttribute('hidden');
-      btnStop.disabled = state === 'stopped';
     }
   }
 
@@ -246,6 +236,26 @@ const { locale } = Astro.props;
     }
   }
 
+  function loadAudio(buffer: AudioBuffer) {
+    if (currentPlayback) { currentPlayback.dispose(); currentPlayback = null; }
+    if (stopFrameLoop) { stopFrameLoop(); stopFrameLoop = null; }
+    currentBuffer = buffer;
+    peaks = player.extractPeakPairs(buffer, { resolution: 300 });
+    waveformSection.hidden = false;
+    playbackSection.hidden = false;
+    drawWaveform(waveformCanvas, peaks);
+    timeDuration.textContent = formatTime(buffer.duration);
+    timeCurrent.textContent = formatTime(0);
+    waveformCursor.style.left = '0%';
+    prevTotalChunks = 0;
+    setTransportState('stopped', transport, i18n);
+    updateStretcherVisibility();
+  }
+
+  synthFreq.addEventListener('input', () => {
+    synthFreqVal.textContent = `${synthFreq.value} Hz`;
+  });
+
   synthDur.addEventListener('input', () => {
     synthDurVal.textContent = `${Number(synthDur.value).toFixed(1)} s`;
   });
@@ -259,71 +269,24 @@ const { locale } = Astro.props;
   btnGenerate.addEventListener('click', async () => {
     await player.ensureRunning();
     initNodes();
-    const dur = Number(synthDur.value);
-    const type = synthType.value;
-    let buffer: AudioBuffer;
-    switch (type) {
-      case 'noise': buffer = player.createNoiseBuffer(dur); break;
-      case 'click': buffer = player.createClickBuffer(440, dur); break;
-      default: buffer = player.createSineBuffer(440, dur);
-    }
+    const buffer = generateSynthBuffer(player, synthType.value, Number(synthFreq.value), Number(synthDur.value));
     loadAudio(buffer);
   });
 
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    fileLabel.classList.add('is-loading');
-    fileLabelText.textContent = i18n.loading;
-    fileName.innerHTML = '<span class="spinner"></span>';
-    try {
-      await player.ensureRunning();
-      initNodes();
-      const buffer = await player.loadFromBlob(file);
-      fileName.textContent = file.name;
-      loadAudio(buffer);
-    } catch {
-      fileName.textContent = i18n.loadFailed;
-    } finally {
-      fileLabel.classList.remove('is-loading');
-      fileLabelText.textContent = i18n.loadFile;
-    }
-  });
-
-  function loadAudio(buffer: AudioBuffer) {
-    if (currentPlayback) { currentPlayback.dispose(); currentPlayback = null; }
-    if (stopFrameLoop) { stopFrameLoop(); stopFrameLoop = null; }
-    currentBuffer = buffer;
-    peaks = player.extractPeakPairs(buffer, { resolution: 300 });
-    waveformSection.hidden = false;
-    playbackSection.hidden = false;
-    drawWaveform(peaks);
-    timeDuration.textContent = formatTime(buffer.duration);
-    timeCurrent.textContent = formatTime(0);
-    waveformCursor.style.left = '0%';
-    prevTotalChunks = 0;
-    setTransportState('stopped');
-    updateStretcherVisibility();
-  }
-
-  function drawWaveform(pairs: PeakPair[]) {
-    const rect = waveformCanvas.parentElement!.getBoundingClientRect();
-    waveformCanvas.width = rect.width * devicePixelRatio;
-    waveformCanvas.height = rect.height * devicePixelRatio;
-    const c = waveformCanvas.getContext('2d')!;
-    c.scale(devicePixelRatio, devicePixelRatio);
-    const w = rect.width, h = rect.height, mid = h / 2;
-    const barWidth = w / pairs.length;
-    c.clearRect(0, 0, w, h);
-    for (let i = 0; i < pairs.length; i++) {
-      const { min, max } = pairs[i]!;
-      c.fillStyle = 'rgba(99, 102, 241, 0.6)';
-      c.fillRect(i * barWidth, mid - max * mid, barWidth - 0.5, (max - min) * mid);
-    }
-  }
+  setupFileInputHandler(
+    player, i18n,
+    {
+      fileInput: $<HTMLInputElement>('tempo-file-input'),
+      fileLabel: $('tempo-file-label'),
+      fileLabelText: $('tempo-file-label-text'),
+      fileName: $('tempo-file-name'),
+    },
+    initNodes,
+    loadAudio,
+  );
 
   window.addEventListener('resize', () => {
-    if (peaks.length > 0) drawWaveform(peaks);
+    if (peaks.length > 0) drawWaveform(waveformCanvas, peaks);
   });
 
   waveformCanvas.parentElement!.addEventListener('click', (e) => {
@@ -339,12 +302,12 @@ const { locale } = Astro.props;
     if (!currentBuffer) return;
     if (currentPlayback && currentPlayback.getState() === 'playing') {
       currentPlayback.pause();
-      setTransportState('paused');
+      setTransportState('paused', transport, i18n);
       return;
     }
     if (currentPlayback && currentPlayback.getState() === 'paused') {
       currentPlayback.resume();
-      setTransportState('playing');
+      setTransportState('playing', transport, i18n);
       return;
     }
     if (currentPlayback) currentPlayback.dispose();
@@ -355,19 +318,19 @@ const { locale } = Astro.props;
       playbackRate: Number(speedInput.value),
       preservePitch: preservePitch.checked,
     });
-    setTransportState('playing');
+    setTransportState('playing', transport, i18n);
     updateStretcherVisibility();
 
     stopFrameLoop = player.onFrame(currentPlayback, (snapshot) => {
       waveformCursor.style.left = `${snapshot.progress * 100}%`;
       timeCurrent.textContent = formatTime(snapshot.position);
-      if (snapshot.state === 'playing') setTransportState('playing');
-      else if (snapshot.state === 'paused') setTransportState('paused');
+      if (snapshot.state === 'playing') setTransportState('playing', transport, i18n);
+      else if (snapshot.state === 'paused') setTransportState('paused', transport, i18n);
       updateStretcherUI(snapshot.stretcher);
     });
 
     currentPlayback.on('ended', () => {
-      setTransportState('stopped');
+      setTransportState('stopped', transport, i18n);
       updateStretcherVisibility();
       waveformCursor.style.left = '0%';
       timeCurrent.textContent = formatTime(0);
@@ -377,7 +340,7 @@ const { locale } = Astro.props;
   btnStop.addEventListener('click', () => {
     if (currentPlayback) {
       currentPlayback.stop();
-      setTransportState('stopped');
+      setTransportState('stopped', transport, i18n);
       updateStretcherVisibility();
       waveformCursor.style.left = '0%';
       timeCurrent.textContent = formatTime(0);

@@ -114,18 +114,14 @@ const { locale } = Astro.props;
 
 <script>
   import { getSharedPlayer, formatTime } from '../../demo/shared-player';
+  import { initI18nStrings, drawWaveform, setTransportState, setupFileInputHandler, generateSynthBuffer } from '../../demo/demo-utils';
+  import type { TransportElements } from '../../demo/demo-utils';
   import type { Playback, PeakPair } from 'waa';
 
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
   const wrapper = document.querySelector('.demo-wrapper') as HTMLElement;
-  const i18n = {
-    pause: wrapper?.dataset.i18nPause ?? 'Pause',
-    play: wrapper?.dataset.i18nPlay ?? 'Play',
-    loading: wrapper?.dataset.i18nLoading ?? 'Loading...',
-    loadFailed: wrapper?.dataset.i18nLoadFailed ?? 'Failed to load file',
-    loadFile: wrapper?.dataset.i18nLoadFile ?? 'Load Audio File',
-  };
+  const i18n = initI18nStrings(wrapper);
 
   const synthType = $<HTMLSelectElement>('synth-type');
   const synthFreq = $<HTMLInputElement>('synth-freq');
@@ -133,10 +129,6 @@ const { locale } = Astro.props;
   const synthDur = $<HTMLInputElement>('synth-dur');
   const synthDurVal = $('synth-dur-val');
   const btnGenerate = $<HTMLButtonElement>('btn-generate');
-  const fileInput = $<HTMLInputElement>('file-input');
-  const fileLabel = $('file-label');
-  const fileLabelText = $('file-label-text');
-  const fileName = $('file-name');
 
   const waveformSection = $('waveform-section');
   const waveformCanvas = $<HTMLCanvasElement>('waveform-canvas');
@@ -147,8 +139,12 @@ const { locale } = Astro.props;
   const playbackSection = $('playback-section');
   const btnPlayPause = $<HTMLButtonElement>('btn-play-pause');
   const btnStop = $<HTMLButtonElement>('btn-stop');
-  const iconPlay = btnPlayPause.querySelector('.icon-play') as SVGElement;
-  const iconPause = btnPlayPause.querySelector('.icon-pause') as SVGElement;
+  const transport: TransportElements = {
+    btnPlayPause,
+    btnStop,
+    iconPlay: btnPlayPause.querySelector('.icon-play') as SVGElement,
+    iconPause: btnPlayPause.querySelector('.icon-pause') as SVGElement,
+  };
   const volumeInput = $<HTMLInputElement>('volume');
   const panInput = $<HTMLInputElement>('pan');
   const speedSelect = $<HTMLSelectElement>('speed');
@@ -170,21 +166,18 @@ const { locale } = Astro.props;
     }
   }
 
-  type TransportState = 'stopped' | 'playing' | 'paused';
-
-  function setTransportState(state: TransportState) {
-    btnPlayPause.dataset.state = state;
-    if (state === 'playing') {
-      iconPlay.setAttribute('hidden', '');
-      iconPause.removeAttribute('hidden');
-      btnPlayPause.title = i18n.pause;
-      btnStop.disabled = false;
-    } else {
-      iconPause.setAttribute('hidden', '');
-      iconPlay.removeAttribute('hidden');
-      btnPlayPause.title = i18n.play;
-      btnStop.disabled = state === 'stopped';
-    }
+  function loadAudio(buffer: AudioBuffer) {
+    if (currentPlayback) { currentPlayback.dispose(); currentPlayback = null; }
+    if (stopFrameLoop) { stopFrameLoop(); stopFrameLoop = null; }
+    currentBuffer = buffer;
+    peaks = player.extractPeakPairs(buffer, { resolution: 300 });
+    waveformSection.hidden = false;
+    playbackSection.hidden = false;
+    drawWaveform(waveformCanvas, peaks);
+    timeDuration.textContent = formatTime(buffer.duration);
+    timeCurrent.textContent = formatTime(0);
+    waveformCursor.style.left = '0%';
+    setTransportState('stopped', transport, i18n);
   }
 
   synthFreq.addEventListener('input', () => {
@@ -198,70 +191,24 @@ const { locale } = Astro.props;
   btnGenerate.addEventListener('click', async () => {
     await player.ensureRunning();
     initNodes();
-    const freq = Number(synthFreq.value);
-    const dur = Number(synthDur.value);
-    const type = synthType.value;
-    let buffer: AudioBuffer;
-    switch (type) {
-      case 'noise': buffer = player.createNoiseBuffer(dur); break;
-      case 'click': buffer = player.createClickBuffer(freq, dur); break;
-      default: buffer = player.createSineBuffer(freq, dur);
-    }
+    const buffer = generateSynthBuffer(player, synthType.value, Number(synthFreq.value), Number(synthDur.value));
     loadAudio(buffer);
   });
 
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    fileLabel.classList.add('is-loading');
-    fileLabelText.textContent = i18n.loading;
-    fileName.innerHTML = '<span class="spinner"></span>';
-    try {
-      await player.ensureRunning();
-      initNodes();
-      const buffer = await player.loadFromBlob(file);
-      fileName.textContent = file.name;
-      loadAudio(buffer);
-    } catch {
-      fileName.textContent = i18n.loadFailed;
-    } finally {
-      fileLabel.classList.remove('is-loading');
-      fileLabelText.textContent = i18n.loadFile;
-    }
-  });
-
-  function loadAudio(buffer: AudioBuffer) {
-    if (currentPlayback) { currentPlayback.dispose(); currentPlayback = null; }
-    if (stopFrameLoop) { stopFrameLoop(); stopFrameLoop = null; }
-    currentBuffer = buffer;
-    peaks = player.extractPeakPairs(buffer, { resolution: 300 });
-    waveformSection.hidden = false;
-    playbackSection.hidden = false;
-    drawWaveform(peaks);
-    timeDuration.textContent = formatTime(buffer.duration);
-    timeCurrent.textContent = formatTime(0);
-    waveformCursor.style.left = '0%';
-    setTransportState('stopped');
-  }
-
-  function drawWaveform(pairs: PeakPair[]) {
-    const rect = waveformCanvas.parentElement!.getBoundingClientRect();
-    waveformCanvas.width = rect.width * devicePixelRatio;
-    waveformCanvas.height = rect.height * devicePixelRatio;
-    const c = waveformCanvas.getContext('2d')!;
-    c.scale(devicePixelRatio, devicePixelRatio);
-    const w = rect.width, h = rect.height, mid = h / 2;
-    const barWidth = w / pairs.length;
-    c.clearRect(0, 0, w, h);
-    for (let i = 0; i < pairs.length; i++) {
-      const { min, max } = pairs[i]!;
-      c.fillStyle = 'rgba(99, 102, 241, 0.6)';
-      c.fillRect(i * barWidth, mid - max * mid, barWidth - 0.5, (max - min) * mid);
-    }
-  }
+  setupFileInputHandler(
+    player, i18n,
+    {
+      fileInput: $<HTMLInputElement>('file-input'),
+      fileLabel: $('file-label'),
+      fileLabelText: $('file-label-text'),
+      fileName: $('file-name'),
+    },
+    initNodes,
+    loadAudio,
+  );
 
   window.addEventListener('resize', () => {
-    if (peaks.length > 0) drawWaveform(peaks);
+    if (peaks.length > 0) drawWaveform(waveformCanvas, peaks);
   });
 
   waveformCanvas.parentElement!.addEventListener('click', (e) => {
@@ -277,12 +224,12 @@ const { locale } = Astro.props;
     if (!currentBuffer) return;
     if (currentPlayback && currentPlayback.getState() === 'playing') {
       currentPlayback.pause();
-      setTransportState('paused');
+      setTransportState('paused', transport, i18n);
       return;
     }
     if (currentPlayback && currentPlayback.getState() === 'paused') {
       currentPlayback.resume();
-      setTransportState('playing');
+      setTransportState('playing', transport, i18n);
       return;
     }
     if (currentPlayback) currentPlayback.dispose();
@@ -293,17 +240,17 @@ const { locale } = Astro.props;
       loop: loopCheckbox.checked,
       playbackRate: Number(speedSelect.value),
     });
-    setTransportState('playing');
+    setTransportState('playing', transport, i18n);
 
     stopFrameLoop = player.onFrame(currentPlayback, (snapshot) => {
       waveformCursor.style.left = `${snapshot.progress * 100}%`;
       timeCurrent.textContent = formatTime(snapshot.position);
-      if (snapshot.state === 'playing') setTransportState('playing');
-      else if (snapshot.state === 'paused') setTransportState('paused');
+      if (snapshot.state === 'playing') setTransportState('playing', transport, i18n);
+      else if (snapshot.state === 'paused') setTransportState('paused', transport, i18n);
     });
 
     currentPlayback.on('ended', () => {
-      setTransportState('stopped');
+      setTransportState('stopped', transport, i18n);
       waveformCursor.style.left = '0%';
       timeCurrent.textContent = formatTime(0);
     });
@@ -312,7 +259,7 @@ const { locale } = Astro.props;
   btnStop.addEventListener('click', () => {
     if (currentPlayback) {
       currentPlayback.stop();
-      setTransportState('stopped');
+      setTransportState('stopped', transport, i18n);
       waveformCursor.style.left = '0%';
       timeCurrent.textContent = formatTime(0);
     }

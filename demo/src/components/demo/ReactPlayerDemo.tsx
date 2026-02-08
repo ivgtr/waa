@@ -61,6 +61,12 @@ export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
   }
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [playback, setPlayback] = useState<Playback | null>(null);
+  const [synthType, setSynthType] = useState('sine');
+  const [synthFreq, setSynthFreq] = useState(440);
+  const [synthDur, setSynthDur] = useState(3);
+  const [fileName, setFileName] = useState('');
+  const [fileLoading, setFileLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const snap = usePlaybackSnapshot(playback);
   const peaks = useMemo(
     () => (buffer && playerRef.current ? playerRef.current.extractPeakPairs(buffer, { resolution: 200 }) : []),
@@ -74,8 +80,35 @@ export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
       playback.stop();
     }
     setPlayback(null);
-    const buf = p.createSineBuffer(440, 3);
+    let buf: AudioBuffer;
+    switch (synthType) {
+      case 'noise': buf = p.createNoiseBuffer(synthDur); break;
+      case 'click': buf = p.createClickBuffer(synthFreq, synthDur); break;
+      default: buf = p.createSineBuffer(synthFreq, synthDur);
+    }
     setBuffer(buf);
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileLoading(true);
+    setFileName('');
+    try {
+      const p = getPlayer();
+      await p.ensureRunning();
+      if (playback && playback.getState() !== 'stopped') {
+        playback.stop();
+      }
+      setPlayback(null);
+      const buf = await p.loadFromBlob(file);
+      setBuffer(buf);
+      setFileName(file.name);
+    } catch {
+      setFileName(t(locale, 'source.load-failed'));
+    } finally {
+      setFileLoading(false);
+    }
   }
 
   function handleToggle() {
@@ -105,9 +138,43 @@ export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
       <section className="card">
         <h2>{t(locale, 'source.title')}</h2>
         <p className="description">{t(locale, 'source.description')}</p>
-        <button className="btn btn-primary" onClick={handleGenerate}>
-          {t(locale, 'source.generate')}
-        </button>
+        <div className="source-controls">
+          <div className="synth-controls">
+            <div className="synth-params">
+              <label className="synth-label">
+                <span className="label-text">{t(locale, 'source.type')}</span>
+                <select value={synthType} onChange={e => setSynthType(e.target.value)}>
+                  <option value="sine">{t(locale, 'source.sine')}</option>
+                  <option value="noise">{t(locale, 'source.noise')}</option>
+                  <option value="click">{t(locale, 'source.click')}</option>
+                </select>
+              </label>
+              <label className="synth-label">
+                <span className="label-text">{t(locale, 'source.frequency')}</span>
+                <input type="range" min="50" max="2000" value={synthFreq} onChange={e => setSynthFreq(Number(e.target.value))} />
+                <span className="range-value">{synthFreq} Hz</span>
+              </label>
+              <label className="synth-label">
+                <span className="label-text">{t(locale, 'source.duration')}</span>
+                <input type="range" min="0.5" max="5" step="0.5" value={synthDur} onChange={e => setSynthDur(Number(e.target.value))} />
+                <span className="range-value">{synthDur.toFixed(1)} s</span>
+              </label>
+            </div>
+            <button className="btn btn-primary" onClick={handleGenerate}>
+              {t(locale, 'source.generate')}
+            </button>
+          </div>
+          <div className="divider">{t(locale, 'source.or')}</div>
+          <div className="file-controls">
+            <label className={`btn btn-secondary file-label${fileLoading ? ' is-loading' : ''}`}>
+              <svg className="file-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span>{fileLoading ? t(locale, 'source.loading') : t(locale, 'source.load-file')}</span>
+              <input ref={fileInputRef} type="file" accept="audio/*" hidden onChange={handleFileChange} />
+            </label>
+            {fileName && <span className="file-name">{fileName}</span>}
+            {fileLoading && <span className="file-name"><span className="spinner"></span></span>}
+          </div>
+        </div>
       </section>
 
       {buffer && (

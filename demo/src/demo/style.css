@@ -160,7 +160,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.demo-wrapper #btn-generate {
+.demo-wrapper .synth-controls .btn-primary {
   align-self: flex-end;
   height: 36px;
 }
@@ -241,7 +241,7 @@
   cursor: pointer;
 }
 
-.demo-wrapper #waveform-canvas {
+.demo-wrapper .waveform-container canvas {
   width: 100%;
   height: 100%;
   display: block;
@@ -642,7 +642,7 @@
     align-items: stretch;
   }
 
-  .demo-wrapper #btn-generate {
+  .demo-wrapper .synth-controls .btn-primary {
     align-self: stretch;
   }
 
