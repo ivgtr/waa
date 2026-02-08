@@ -46,7 +46,10 @@ function AudioPlayer({ url }: { url: string }) {
 }` as const;
 
 export const reactHookFn = `import { useSyncExternalStore, useRef, useCallback } from "react";
-import { subscribeSnapshot, getSnapshot, play, loadBuffer, ensureRunning } from "waa-play/adapters";
+import { createContext, ensureRunning } from "waa-play/context";
+import { loadBuffer } from "waa-play/buffer";
+import { play } from "waa-play/play";
+import { subscribeSnapshot, getSnapshot } from "waa-play/adapters";
 import type { Playback, PlaybackSnapshot } from "waa-play";
 
 function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null {
