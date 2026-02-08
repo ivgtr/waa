@@ -1,6 +1,8 @@
-export const reactPlayerDemo = `import { useState, useMemo, useSyncExternalStore, useRef, useCallback } from "react";
+export const reactPlayerDemo = `import { useCallback, useSyncExternalStore, useState, useMemo, useRef } from "react";
 import { WaaPlayer, getSnapshot, subscribeSnapshot } from "waa-play";
 import type { Playback, PlaybackSnapshot, PeakPair } from "waa-play";
+
+// --- hooks ---
 
 function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null {
   const subscribe = useCallback(
@@ -14,32 +16,79 @@ function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null
   return useSyncExternalStore(subscribe, snap, snap);
 }
 
-function Player({ buffer }: { buffer: AudioBuffer }) {
-  const playerRef = useRef(new WaaPlayer());
+function useReactPlayer() {
+  const waaRef = useRef(new WaaPlayer());
+  const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [playback, setPlayback] = useState<Playback | null>(null);
   const snap = usePlaybackSnapshot(playback);
   const peaks = useMemo(
-    () => playerRef.current.extractPeakPairs(buffer, { resolution: 200 }),
+    () => (buffer ? waaRef.current.extractPeakPairs(buffer, { resolution: 200 }) : []),
     [buffer],
   );
 
+  async function handleGenerate() {
+    const waa = waaRef.current;
+    await waa.ensureRunning();
+    if (playback && playback.getState() !== "stopped") playback.stop();
+    setPlayback(null);
+    setBuffer(waa.createSineBuffer(440, 3));
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const waa = waaRef.current;
+    await waa.ensureRunning();
+    setPlayback(null);
+    setBuffer(await waa.loadFromBlob(file));
+  }
+
+  function handleToggle() {
+    if (!buffer) return;
+    if (!playback || playback.getState() === "stopped") {
+      if (playback) playback.dispose();
+      setPlayback(waaRef.current.play(buffer, { loop: true }));
+    } else {
+      playback.togglePlayPause();
+    }
+  }
+
+  function handleStop() {
+    playback?.stop();
+  }
+
+  function handleSeek(ratio: number) {
+    if (playback && buffer) {
+      playback.seek(ratio * buffer.duration);
+    }
+  }
+
+  return { buffer, snap, peaks, handleGenerate, handleFile, handleToggle, handleStop, handleSeek };
+}
+
+// --- component ---
+
+export default function ReactPlayerDemo() {
+  const { buffer, snap, peaks, handleGenerate, handleFile, handleToggle, handleStop, handleSeek } =
+    useReactPlayer();
+  const state = snap?.state ?? "stopped";
+
   return (
     <div>
-      <Waveform peaks={peaks} progress={snap?.progress ?? 0} />
-      <button
-        onClick={() => {
-          if (!playback) {
-            setPlayback(playerRef.current.play(buffer));
-          } else {
-            playback.togglePlayPause();
-          }
-        }}
-      >
-        {snap?.state === "playing" ? "Pause" : "Play"}
-      </button>
-      <span>
-        {snap?.position.toFixed(1)}s / {snap?.duration.toFixed(1)}s
-      </span>
+      <button onClick={handleGenerate}>Generate Sine</button>
+      <input type="file" accept="audio/*" onChange={handleFile} />
+      {buffer && (
+        <>
+          <Waveform peaks={peaks} progress={snap?.progress ?? 0} onSeek={handleSeek} />
+          <span>{formatTime(snap?.position ?? 0)} / {formatTime(snap?.duration ?? 0)}</span>
+          <button onClick={handleToggle}>
+            {state === "playing" ? "Pause" : "Play"}
+          </button>
+          <button onClick={handleStop} disabled={state === "stopped"}>
+            Stop
+          </button>
+        </>
+      )}
     </div>
   );
 }` as const;

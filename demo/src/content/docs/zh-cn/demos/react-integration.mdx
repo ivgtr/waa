@@ -13,13 +13,12 @@ import { reactPlayerDemo } from '../../../../snippets/demos/react-integration';
 
 ## 源代码
 
-此演示的完整源代码。
+此演示的核心逻辑。省略了 UI 渲染代码。
 
 <Code code={reactPlayerDemo} lang="tsx" />
 
 ## 要点
 
-- **`useSyncExternalStore`**: React 18+ 官方 API，用于订阅外部存储
-- **`subscribeSnapshot`**: 订阅 Playback 状态变化
-- **`getSnapshot`**: 获取当前的 `PlaybackSnapshot`（state, position, duration, progress）
-- **`onFrame`**: 基于 `requestAnimationFrame` 的帧循环（用于可视化等）
+- **`usePlaybackSnapshot`**: 封装 `useSyncExternalStore` + `subscribeSnapshot` / `getSnapshot` 的通用 hook，将 Playback 状态作为 React state 订阅
+- **`useReactPlayer`**: 将播放器生命周期（WaaPlayer 管理、缓冲区生成/加载、播放控制）整合到单个 hook 中，使组件仅负责视图渲染
+- **BYO AudioContext**: `WaaPlayer` 内部管理 AudioContext。在用户手势后调用 `ensureRunning()` 以恢复

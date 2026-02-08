@@ -13,13 +13,12 @@ A working demo of waa-play with React. Uses `useSyncExternalStore` with `subscri
 
 ## Source Code
 
-The complete source code of this demo.
+The core logic of this demo. UI rendering code is omitted.
 
 <Code code={reactPlayerDemo} lang="tsx" />
 
 ## Key Points
 
-- **`useSyncExternalStore`**: React 18+ official API for subscribing to external stores
-- **`subscribeSnapshot`**: Subscribe to Playback state changes
-- **`getSnapshot`**: Get the current `PlaybackSnapshot` (state, position, duration, progress)
-- **`onFrame`**: `requestAnimationFrame`-based frame loop (for visualizers, etc.)
+- **`usePlaybackSnapshot`**: A reusable hook wrapping `useSyncExternalStore` + `subscribeSnapshot` / `getSnapshot` to subscribe to Playback state as React state
+- **`useReactPlayer`**: Consolidates player lifecycle (WaaPlayer management, buffer generation/loading, playback controls) into a single hook, keeping the component view-only
+- **BYO AudioContext**: `WaaPlayer` manages its own AudioContext internally. Call `ensureRunning()` after a user gesture to resume
