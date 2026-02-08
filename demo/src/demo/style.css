@@ -282,8 +282,8 @@
   gap: 0.5rem;
 }
 
-.demo-wrapper svg[hidden] {
-  display: none;
+.demo-wrapper [hidden] {
+  display: none !important;
 }
 
 .demo-wrapper .btn-transport {

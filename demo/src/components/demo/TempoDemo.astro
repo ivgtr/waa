@@ -192,12 +192,7 @@ const { locale } = Astro.props;
   let prevTotalChunks = 0;
 
   function updateStretcherUI(snap: StretcherSnapshotExtension | undefined) {
-    if (!snap) {
-      stretcherStatus.hidden = true;
-      chunkStrip.hidden = true;
-      waveformBufferBar.innerHTML = '';
-      return;
-    }
+    if (!snap) return;
     stretcherStatus.hidden = false;
     chunkStrip.hidden = false;
     stretcherProgressFill.style.width = `${(snap.windowConversionProgress * 100).toFixed(1)}%`;
@@ -330,6 +325,7 @@ const { locale } = Astro.props;
     });
 
     currentPlayback.on('ended', () => {
+      if (stopFrameLoop) { stopFrameLoop(); stopFrameLoop = null; }
       setTransportState('stopped', transport, i18n);
       updateStretcherVisibility();
       waveformCursor.style.left = '0%';
@@ -339,6 +335,7 @@ const { locale } = Astro.props;
 
   btnStop.addEventListener('click', () => {
     if (currentPlayback) {
+      if (stopFrameLoop) { stopFrameLoop(); stopFrameLoop = null; }
       currentPlayback.stop();
       setTransportState('stopped', transport, i18n);
       updateStretcherVisibility();
@@ -348,6 +345,6 @@ const { locale } = Astro.props;
   });
 </script>
 
-<style>
+<style is:global>
   @import '../../demo/style.css';
 </style>
