@@ -1,0 +1,63 @@
+---
+title: 框架集成
+description: 与 React 等框架的集成模式、基于 Promise 的等待以及 UI 动画同步
+---
+
+import { Code } from '@astrojs/starlight/components';
+import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../../snippets/use-cases/framework-integration';
+
+本指南介绍与 React 等框架的集成模式、基于 Promise 的等待以及 UI 动画同步。
+
+**使用的模块**: `adapters`, `play`
+
+## React 自定义 Hook
+
+`subscribeSnapshot` 和 `getSnapshot` 与 React 的 `useSyncExternalStore` 直接兼容。
+
+<Code code={reactHookPlayer} lang="tsx" />
+
+**说明**: `subscribeSnapshot` 订阅 `statechange`、`timeupdate`、`seek` 和 `ended` 事件，在变化时调用 callback。`getSnapshot` 返回不可变的快照。这两个函数直接对应 `useSyncExternalStore` 的 subscribe / getSnapshot 参数。
+
+<details>
+<summary>函数 API 版</summary>
+
+<Code code={reactHookFn} lang="tsx" />
+
+</details>
+
+## 基于 Promise 的等待
+
+您可以使用 Promise 等待播放完成或到达指定位置。
+
+<Code code={promiseWaitPlayer} lang="ts" />
+
+**说明**: `whenEnded` 返回一个在 `ended` 事件（自然结束）时 resolve 的 Promise。手动 `stop()` 不会 resolve。`whenPosition` 监听 `timeupdate` 事件，在到达（或超过）指定位置时 resolve。
+
+<details>
+<summary>函数 API 版</summary>
+
+<Code code={promiseWaitFn} lang="ts" />
+
+</details>
+
+## 平滑 UI 动画
+
+`onFrame` 基于 `requestAnimationFrame` 实现平滑的进度条和播放器更新。
+
+<Code code={smoothAnimationPlayer} lang="ts" />
+
+**说明**: `onFrame` 内部管理 `requestAnimationFrame` 循环，每帧将 `PlaybackSnapshot` 传递给 callback。调用返回的函数可停止循环。相比 `timeupdate`（基于 setInterval，默认 50ms），可实现更平滑的更新。
+
+**与 `timeupdate` 事件的区别**: `timeupdate` 基于 setInterval，在后台标签页中也能工作。`onFrame` 基于 requestAnimationFrame，适合视觉更新，但在后台会暂停。
+
+<details>
+<summary>函数 API 版</summary>
+
+<Code code={smoothAnimationFn} lang="ts" />
+
+</details>
+
+## 相关 API
+
+- [WaaPlayer](/waa/api/player/)
+- [函数 API](/waa/api/functions/)

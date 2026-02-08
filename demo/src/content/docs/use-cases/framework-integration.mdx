@@ -1,0 +1,63 @@
+---
+title: フレームワーク統合
+description: React などのフレームワークとの統合パターン、Promise ベースの待機、UI アニメーション連携
+---
+
+import { Code } from '@astrojs/starlight/components';
+import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../snippets/use-cases/framework-integration';
+
+React などのフレームワークとの統合パターンや、Promise ベースの待機、UI アニメーション連携について説明します。
+
+**使用モジュール**: `adapters`, `play`
+
+## React カスタムフック
+
+`subscribeSnapshot` と `getSnapshot` は React の `useSyncExternalStore` と直接互換性があります。
+
+<Code code={reactHookPlayer} lang="tsx" />
+
+**解説**: `subscribeSnapshot` は `statechange`, `timeupdate`, `seek`, `ended` イベントを購読し、変更時に callback を呼びます。`getSnapshot` はイミュータブルなスナップショットを返します。この2つの関数は `useSyncExternalStore` の subscribe / getSnapshot パラメータにそのまま対応します。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={reactHookFn} lang="tsx" />
+
+</details>
+
+## Promise ベース待機
+
+再生完了やポジション到達を Promise で待機できます。
+
+<Code code={promiseWaitPlayer} lang="ts" />
+
+**解説**: `whenEnded` は `ended` イベント（自然終了）で resolve する Promise を返します。手動 `stop()` では resolve されません。`whenPosition` は `timeupdate` イベントを監視し、指定ポジションに到達（または超過）したら resolve します。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={promiseWaitFn} lang="ts" />
+
+</details>
+
+## スムーズ UI アニメーション
+
+`onFrame` で `requestAnimationFrame` ベースのスムーズなプログレスバー・シーカー更新が可能です。
+
+<Code code={smoothAnimationPlayer} lang="ts" />
+
+**解説**: `onFrame` は `requestAnimationFrame` ループを内部で管理し、毎フレーム `PlaybackSnapshot` を callback に渡します。戻り値の関数を呼ぶとループが停止します。`timeupdate`（setInterval ベース、デフォルト 50ms）より滑らかな更新が可能です。
+
+**`timeupdate` イベントとの違い**: `timeupdate` は `setInterval` ベースでバックグラウンドタブでも動作します。`onFrame` は `requestAnimationFrame` ベースで視覚更新に最適ですがバックグラウンドでは停止します。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={smoothAnimationFn} lang="ts" />
+
+</details>
+
+## 関連 API
+
+- [WaaPlayer](/waa/api/player/)
+- [関数 API](/waa/api/functions/)

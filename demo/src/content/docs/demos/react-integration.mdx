@@ -4,6 +4,8 @@ description: React で waa-play を使用するインタラクティブデモ
 ---
 
 import ReactPlayerDemo from '../../../components/demo/ReactPlayerDemo.tsx';
+import { Code } from '@astrojs/starlight/components';
+import { reactPlayerDemo } from '../../../snippets/demos/react-integration';
 
 React で waa-play を使用する実動デモです。`useSyncExternalStore` と `subscribeSnapshot` / `getSnapshot` を使って、再生状態をリアクティブに管理します。
 
@@ -13,49 +15,7 @@ React で waa-play を使用する実動デモです。`useSyncExternalStore` �
 
 このデモの完全なソースコードです。
 
-```tsx
-import { useState, useMemo, useSyncExternalStore, useRef } from "react";
-import { WaaPlayer, getSnapshot, subscribeSnapshot } from "waa-play";
-import type { Playback, PlaybackSnapshot, PeakPair } from "waa-play";
-
-// カスタムフック: 再生スナップショットを購読
-function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null {
-  return useSyncExternalStore(
-    (cb) => (playback ? subscribeSnapshot(playback, cb) : () => {}),
-    () => (playback ? getSnapshot(playback) : null),
-  );
-}
-
-function Player({ buffer }: { buffer: AudioBuffer }) {
-  const playerRef = useRef(new WaaPlayer());
-  const [playback, setPlayback] = useState<Playback | null>(null);
-  const snap = usePlaybackSnapshot(playback);
-  const peaks = useMemo(
-    () => playerRef.current.extractPeakPairs(buffer, { resolution: 200 }),
-    [buffer],
-  );
-
-  return (
-    <div>
-      <Waveform peaks={peaks} progress={snap?.progress ?? 0} />
-      <button
-        onClick={() => {
-          if (!playback) {
-            setPlayback(playerRef.current.play(buffer));
-          } else {
-            playback.togglePlayPause();
-          }
-        }}
-      >
-        {snap?.state === "playing" ? "Pause" : "Play"}
-      </button>
-      <span>
-        {snap?.position.toFixed(1)}s / {snap?.duration.toFixed(1)}s
-      </span>
-    </div>
-  );
-}
-```
+<Code code={reactPlayerDemo} lang="tsx" />
 
 ## ポイント
 

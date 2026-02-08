@@ -4,6 +4,8 @@ description: 在 React 中使用 waa-play 的交互式演示
 ---
 
 import ReactPlayerDemo from '../../../../components/demo/ReactPlayerDemo.tsx';
+import { Code } from '@astrojs/starlight/components';
+import { reactPlayerDemo } from '../../../../snippets/demos/react-integration';
 
 在 React 中使用 waa-play 的实际运行演示。使用 `useSyncExternalStore` 和 `subscribeSnapshot` / `getSnapshot` 来响应式管理播放状态。
 
@@ -13,48 +15,7 @@ import ReactPlayerDemo from '../../../../components/demo/ReactPlayerDemo.tsx';
 
 此演示的完整源代码。
 
-```tsx
-import { useState, useMemo, useSyncExternalStore, useRef } from "react";
-import { WaaPlayer, getSnapshot, subscribeSnapshot } from "waa-play";
-import type { Playback, PlaybackSnapshot, PeakPair } from "waa-play";
-
-function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null {
-  return useSyncExternalStore(
-    (cb) => (playback ? subscribeSnapshot(playback, cb) : () => {}),
-    () => (playback ? getSnapshot(playback) : null),
-  );
-}
-
-function Player({ buffer }: { buffer: AudioBuffer }) {
-  const playerRef = useRef(new WaaPlayer());
-  const [playback, setPlayback] = useState<Playback | null>(null);
-  const snap = usePlaybackSnapshot(playback);
-  const peaks = useMemo(
-    () => playerRef.current.extractPeakPairs(buffer, { resolution: 200 }),
-    [buffer],
-  );
-
-  return (
-    <div>
-      <Waveform peaks={peaks} progress={snap?.progress ?? 0} />
-      <button
-        onClick={() => {
-          if (!playback) {
-            setPlayback(playerRef.current.play(buffer));
-          } else {
-            playback.togglePlayPause();
-          }
-        }}
-      >
-        {snap?.state === "playing" ? "Pause" : "Play"}
-      </button>
-      <span>
-        {snap?.position.toFixed(1)}s / {snap?.duration.toFixed(1)}s
-      </span>
-    </div>
-  );
-}
-```
+<Code code={reactPlayerDemo} lang="tsx" />
 
 ## 要点
 

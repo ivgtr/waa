@@ -1,0 +1,61 @@
+---
+title: ビジュアライゼーション
+description: 波形描画やリアルタイム周波数表示など、オーディオのビジュアル表現パターン
+---
+
+import { Code } from '@astrojs/starlight/components';
+import { staticWaveformPlayer, staticWaveformFn, playbackCursorPlayer, playbackCursorFn, realtimeFrequencyPlayer, realtimeFrequencyFn } from '../../../snippets/use-cases/visualization';
+
+オーディオデータを視覚的に表現する3つのパターンを紹介します。静的な波形描画、再生カーソル連動、リアルタイム周波数表示を実装する方法を学びます。
+
+**使用モジュール**: `waveform`, `nodes`, `adapters`, `play`
+
+## 1. 静的波形描画
+
+AudioBuffer からピークペアを抽出し、Canvas に波形を描画します。
+
+<Code code={staticWaveformPlayer} lang="ts" />
+
+`extractPeakPairs` は AudioBuffer から min/max のペアを抽出します。`resolution` パラメータで出力データ点数を制御できます。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={staticWaveformFn} lang="ts" />
+
+</details>
+
+## 2. 再生カーソル連動
+
+再生位置に応じてカーソルを動かし、再生済み部分を色分けします。
+
+<Code code={playbackCursorPlayer} lang="ts" />
+
+`onFrame` は `requestAnimationFrame` ベースで `PlaybackSnapshot` を毎フレーム返します。`progress` (0〜1) でカーソル位置を計算できます。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={playbackCursorFn} lang="ts" />
+
+</details>
+
+## 3. リアルタイム周波数表示
+
+AnalyserNode を使用して、再生中の周波数スペクトルをリアルタイムで表示します。
+
+<Code code={realtimeFrequencyPlayer} lang="ts" />
+
+`createAnalyser` で AnalyserNode を生成し、`through` でルーティングします。`getFrequencyDataByte` は Uint8Array (0-255) で周波数データを返します。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={realtimeFrequencyFn} lang="ts" />
+
+</details>
+
+## 関連 API
+
+- [WaaPlayer](/waa/api/player/)
+- [関数 API](/waa/api/functions/)
