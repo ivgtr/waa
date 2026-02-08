@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 
-Composable Web Audio API utilities.
+Composable & batteries-included Web Audio API toolkit.
 
 BYO AudioContext / Zero Dependencies / Framework-agnostic / Sample-accurate / Pitch-preserving time-stretch / Chunk-based streaming
 

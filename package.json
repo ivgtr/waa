@@ -1,7 +1,7 @@
 {
   "name": "waa-play",
   "version": "0.1.1",
-  "description": "Composable Web Audio API utilities. BYO AudioContext. Framework-agnostic. Sample-accurate. Pitch-preserving time-stretch.",
+  "description": "Composable & batteries-included Web Audio API toolkit. BYO AudioContext. Framework-agnostic. Sample-accurate. Pitch-preserving time-stretch.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
