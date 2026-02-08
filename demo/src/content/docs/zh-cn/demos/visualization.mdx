@@ -1,0 +1,51 @@
+---
+title: 可视化
+description: 波形显示和实时频率可视化演示
+---
+
+import VisualizationDemo from '../../../../components/demo/VisualizationDemo.astro';
+
+波形数据提取和实时频率分析的演示。
+
+- **波形显示**: 使用 `extractPeakPairs()` 提取峰值/RMS 数据并在 Canvas 上渲染
+- **分辨率调整**: 通过滑块实时调整波形分辨率
+- **频率可视化**: 使用 AnalyserNode 进行实时频率分析
+
+<VisualizationDemo locale="zh-cn" />
+
+## 代码示例
+
+### 提取波形数据
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const player = new WaaPlayer();
+const buffer = player.createSineBuffer(440, 2);
+
+const peaks = player.extractPeakPairs(buffer, { resolution: 300 });
+
+const canvas = document.querySelector("canvas")!;
+const ctx = canvas.getContext("2d")!;
+const w = canvas.width, h = canvas.height, mid = h / 2;
+const barWidth = w / peaks.length;
+
+for (let i = 0; i < peaks.length; i++) {
+  const { min, max } = peaks[i];
+  ctx.fillStyle = "rgba(99, 102, 241, 0.6)";
+  ctx.fillRect(i * barWidth, mid - max * mid, barWidth - 0.5, (max - min) * mid);
+}
+```
+
+### 实时频率分析
+
+```ts
+const analyser = player.createAnalyser({ fftSize: 256 });
+player.chain(gain, analyser, player.ctx.destination);
+
+const stop = player.onFrame(playback, () => {
+  const data = player.getFrequencyDataByte(analyser);
+  // data 是 Uint8Array — 每个元素是 0-255 的频率段值
+  drawBars(data);
+});
+```

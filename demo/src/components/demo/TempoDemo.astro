@@ -1,0 +1,390 @@
+---
+import { t } from '../../i18n/translations';
+import type { Locale } from '../../i18n/translations';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<div
+  class="demo-wrapper not-content"
+  id="tempo-demo"
+  data-i18n-pause={t(locale, 'playback.pause')}
+  data-i18n-play={t(locale, 'playback.play')}
+  data-i18n-loading={t(locale, 'source.loading')}
+  data-i18n-load-failed={t(locale, 'source.load-failed')}
+  data-i18n-load-file={t(locale, 'source.load-file')}
+  data-i18n-buffering={t(locale, 'stretcher.buffering')}
+>
+  <!-- Sound Source -->
+  <section class="card">
+    <h2>{t(locale, 'source.title')}</h2>
+    <p class="description">{t(locale, 'demo.tempo.source-desc')}</p>
+    <div class="source-controls">
+      <div class="synth-controls">
+        <div class="synth-params">
+          <label class="synth-label">
+            <span class="label-text">{t(locale, 'source.type')}</span>
+            <select id="tempo-synth-type">
+              <option value="sine">{t(locale, 'source.sine')}</option>
+              <option value="noise">{t(locale, 'source.noise')}</option>
+              <option value="click">{t(locale, 'source.click')}</option>
+            </select>
+          </label>
+          <label class="synth-label">
+            <span class="label-text">{t(locale, 'source.duration')}</span>
+            <input type="range" id="tempo-synth-dur" min="1" max="10" step="0.5" value="5" />
+            <span id="tempo-synth-dur-val" class="range-value">5.0 s</span>
+          </label>
+        </div>
+        <button id="tempo-btn-generate" class="btn btn-primary">{t(locale, 'source.generate')}</button>
+      </div>
+      <div class="divider">{t(locale, 'source.or')}</div>
+      <div class="file-controls">
+        <label class="btn btn-secondary file-label" id="tempo-file-label">
+          <svg class="file-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span id="tempo-file-label-text">{t(locale, 'source.load-file')}</span>
+          <input type="file" id="tempo-file-input" accept="audio/*" hidden />
+        </label>
+        <span id="tempo-file-name" class="file-name"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Waveform + Chunk Strip -->
+  <section class="card" id="tempo-waveform-section" hidden>
+    <h2>{t(locale, 'waveform.title')}</h2>
+    <div class="waveform-container">
+      <div id="tempo-waveform-buffer-bar" class="waveform-buffer-bar"></div>
+      <canvas id="tempo-waveform-canvas"></canvas>
+      <div id="tempo-waveform-cursor" class="waveform-cursor"></div>
+    </div>
+    <div id="tempo-chunk-strip" class="chunk-strip" hidden>
+      <div id="tempo-chunk-strip-blocks" class="chunk-strip-blocks"></div>
+    </div>
+    <div class="time-display">
+      <span id="tempo-time-current">0:00.0</span>
+      <span id="tempo-time-duration">0:00.0</span>
+    </div>
+  </section>
+
+  <!-- Playback + Tempo Controls -->
+  <section class="card" id="tempo-playback-section" hidden>
+    <h2>{t(locale, 'demo.tempo.title')}</h2>
+    <div class="playback-controls">
+      <div class="transport-buttons">
+        <button id="tempo-btn-play" class="btn btn-icon btn-transport" data-state="stopped">
+          <svg class="icon-play" viewBox="0 0 24 24" width="20" height="20"><polygon points="6,3 20,12 6,21" fill="currentColor"/></svg>
+          <svg class="icon-pause" viewBox="0 0 24 24" width="20" height="20" hidden><rect x="5" y="3" width="4" height="18" fill="currentColor"/><rect x="15" y="3" width="4" height="18" fill="currentColor"/></svg>
+        </button>
+        <button id="tempo-btn-stop" class="btn btn-icon btn-transport" disabled>
+          <svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor"/></svg>
+        </button>
+      </div>
+      <div class="control-params">
+        <label class="control-label">
+          {t(locale, 'playback.speed')}
+          <input type="range" id="tempo-speed" min="0.5" max="2" step="0.05" value="1" />
+          <span id="tempo-speed-val" class="range-value">1.00x</span>
+        </label>
+        <label class="control-label control-label-checkbox">
+          <input type="checkbox" id="tempo-preserve-pitch" checked />
+          {t(locale, 'playback.preserve-pitch')}
+        </label>
+      </div>
+    </div>
+
+    <!-- Stretcher Status -->
+    <div id="tempo-stretcher-status" class="stretcher-status" hidden>
+      <div class="stretcher-status-header">
+        <span class="stretcher-status-title">{t(locale, 'stretcher.title')}</span>
+        <span id="tempo-stretcher-buffering" class="stretcher-buffering" hidden>
+          <span class="spinner spinner-sm"></span>
+          {t(locale, 'stretcher.buffering')}
+        </span>
+      </div>
+      <div class="stretcher-progress">
+        <div id="tempo-stretcher-progress-fill" class="stretcher-progress-fill" style="width: 0%"></div>
+      </div>
+      <div class="stretcher-info">
+        <span id="tempo-buffer-health" class="buffer-health buffer-empty"></span>
+        <span id="tempo-stretcher-detail" class="stretcher-detail"></span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  import { getSharedPlayer, formatTime } from '../../demo/shared-player';
+  import type { Playback, PeakPair, StretcherSnapshotExtension } from 'waa';
+
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+  const wrapper = document.getElementById('tempo-demo') as HTMLElement;
+  const i18n = {
+    pause: wrapper?.dataset.i18nPause ?? 'Pause',
+    play: wrapper?.dataset.i18nPlay ?? 'Play',
+    loading: wrapper?.dataset.i18nLoading ?? 'Loading...',
+    loadFailed: wrapper?.dataset.i18nLoadFailed ?? 'Failed to load file',
+    loadFile: wrapper?.dataset.i18nLoadFile ?? 'Load Audio File',
+  };
+
+  const synthType = $<HTMLSelectElement>('tempo-synth-type');
+  const synthDur = $<HTMLInputElement>('tempo-synth-dur');
+  const synthDurVal = $('tempo-synth-dur-val');
+  const btnGenerate = $<HTMLButtonElement>('tempo-btn-generate');
+  const fileInput = $<HTMLInputElement>('tempo-file-input');
+  const fileLabel = $('tempo-file-label');
+  const fileLabelText = $('tempo-file-label-text');
+  const fileName = $('tempo-file-name');
+
+  const waveformSection = $('tempo-waveform-section');
+  const waveformCanvas = $<HTMLCanvasElement>('tempo-waveform-canvas');
+  const waveformCursor = $('tempo-waveform-cursor');
+  const waveformBufferBar = $('tempo-waveform-buffer-bar');
+  const chunkStrip = $('tempo-chunk-strip');
+  const chunkStripBlocks = $('tempo-chunk-strip-blocks');
+  const timeCurrent = $('tempo-time-current');
+  const timeDuration = $('tempo-time-duration');
+
+  const playbackSection = $('tempo-playback-section');
+  const btnPlay = $<HTMLButtonElement>('tempo-btn-play');
+  const btnStop = $<HTMLButtonElement>('tempo-btn-stop');
+  const iconPlay = btnPlay.querySelector('.icon-play') as SVGElement;
+  const iconPause = btnPlay.querySelector('.icon-pause') as SVGElement;
+  const speedInput = $<HTMLInputElement>('tempo-speed');
+  const speedVal = $('tempo-speed-val');
+  const preservePitch = $<HTMLInputElement>('tempo-preserve-pitch');
+
+  const stretcherStatus = $('tempo-stretcher-status');
+  const stretcherProgressFill = $('tempo-stretcher-progress-fill');
+  const stretcherBuffering = $('tempo-stretcher-buffering');
+  const bufferHealthDot = $('tempo-buffer-health');
+  const stretcherDetail = $('tempo-stretcher-detail');
+
+  const player = getSharedPlayer();
+  let gainNode: GainNode | null = null;
+  let currentBuffer: AudioBuffer | null = null;
+  let currentPlayback: Playback | null = null;
+  let stopFrameLoop: (() => void) | null = null;
+  let peaks: PeakPair[] = [];
+
+  function initNodes() {
+    if (!gainNode) {
+      gainNode = player.createGain(0.8);
+      player.chain(gainNode, player.ctx.destination);
+    }
+  }
+
+  function setTransportState(state: 'stopped' | 'playing' | 'paused') {
+    btnPlay.dataset.state = state;
+    if (state === 'playing') {
+      iconPlay.setAttribute('hidden', '');
+      iconPause.removeAttribute('hidden');
+      btnStop.disabled = false;
+    } else {
+      iconPause.setAttribute('hidden', '');
+      iconPlay.removeAttribute('hidden');
+      btnStop.disabled = state === 'stopped';
+    }
+  }
+
+  function updateStretcherVisibility() {
+    const isActive = preservePitch.checked && currentPlayback && currentPlayback.getState() !== 'stopped';
+    stretcherStatus.hidden = !isActive;
+    chunkStrip.hidden = !isActive;
+    if (!isActive) waveformBufferBar.innerHTML = '';
+  }
+
+  let prevTotalChunks = 0;
+
+  function updateStretcherUI(snap: StretcherSnapshotExtension | undefined) {
+    if (!snap) {
+      stretcherStatus.hidden = true;
+      chunkStrip.hidden = true;
+      waveformBufferBar.innerHTML = '';
+      return;
+    }
+    stretcherStatus.hidden = false;
+    chunkStrip.hidden = false;
+    stretcherProgressFill.style.width = `${(snap.windowConversionProgress * 100).toFixed(1)}%`;
+    bufferHealthDot.className = `buffer-health buffer-${snap.bufferHealth}`;
+    const pct = (snap.windowConversionProgress * 100).toFixed(0);
+    stretcherDetail.textContent = `window: ${pct}% | ahead: ${snap.aheadSeconds.toFixed(1)}s`;
+    stretcherBuffering.hidden = !snap.buffering;
+    renderChunkStrip(snap);
+  }
+
+  function renderChunkStrip(snap: StretcherSnapshotExtension) {
+    const { chunkStates, currentChunkIndex: playhead, activeWindowStart, activeWindowEnd, totalChunks } = snap;
+    if (totalChunks !== prevTotalChunks) {
+      prevTotalChunks = totalChunks;
+      chunkStripBlocks.innerHTML = '';
+      waveformBufferBar.innerHTML = '';
+      for (let i = 0; i < totalChunks; i++) {
+        const block = document.createElement('div');
+        block.className = 'chunk-block chunk-pending';
+        chunkStripBlocks.appendChild(block);
+        const wbBlock = document.createElement('div');
+        wbBlock.className = 'waveform-buffer-block wb-pending';
+        waveformBufferBar.appendChild(wbBlock);
+      }
+    }
+    const blocks = chunkStripBlocks.children;
+    const wbBlocks = waveformBufferBar.children;
+    for (let i = 0; i < blocks.length; i++) {
+      const state = chunkStates[i] ?? 'pending';
+      let cls = `chunk-block chunk-${state}`;
+      if (i >= activeWindowStart && i <= activeWindowEnd) cls += ' chunk-in-window';
+      if (i === playhead) cls += ' chunk-playhead';
+      if (blocks[i]!.className !== cls) blocks[i]!.className = cls;
+      const wbCls = `waveform-buffer-block wb-${state}`;
+      if (wbBlocks[i] && wbBlocks[i]!.className !== wbCls) wbBlocks[i]!.className = wbCls;
+    }
+  }
+
+  synthDur.addEventListener('input', () => {
+    synthDurVal.textContent = `${Number(synthDur.value).toFixed(1)} s`;
+  });
+
+  speedInput.addEventListener('input', () => {
+    const v = Number(speedInput.value);
+    speedVal.textContent = `${v.toFixed(2)}x`;
+    if (currentPlayback) currentPlayback.setPlaybackRate(v);
+  });
+
+  btnGenerate.addEventListener('click', async () => {
+    await player.ensureRunning();
+    initNodes();
+    const dur = Number(synthDur.value);
+    const type = synthType.value;
+    let buffer: AudioBuffer;
+    switch (type) {
+      case 'noise': buffer = player.createNoiseBuffer(dur); break;
+      case 'click': buffer = player.createClickBuffer(440, dur); break;
+      default: buffer = player.createSineBuffer(440, dur);
+    }
+    loadAudio(buffer);
+  });
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    fileLabel.classList.add('is-loading');
+    fileLabelText.textContent = i18n.loading;
+    fileName.innerHTML = '<span class="spinner"></span>';
+    try {
+      await player.ensureRunning();
+      initNodes();
+      const buffer = await player.loadFromBlob(file);
+      fileName.textContent = file.name;
+      loadAudio(buffer);
+    } catch {
+      fileName.textContent = i18n.loadFailed;
+    } finally {
+      fileLabel.classList.remove('is-loading');
+      fileLabelText.textContent = i18n.loadFile;
+    }
+  });
+
+  function loadAudio(buffer: AudioBuffer) {
+    if (currentPlayback) { currentPlayback.dispose(); currentPlayback = null; }
+    if (stopFrameLoop) { stopFrameLoop(); stopFrameLoop = null; }
+    currentBuffer = buffer;
+    peaks = player.extractPeakPairs(buffer, { resolution: 300 });
+    waveformSection.hidden = false;
+    playbackSection.hidden = false;
+    drawWaveform(peaks);
+    timeDuration.textContent = formatTime(buffer.duration);
+    timeCurrent.textContent = formatTime(0);
+    waveformCursor.style.left = '0%';
+    prevTotalChunks = 0;
+    setTransportState('stopped');
+    updateStretcherVisibility();
+  }
+
+  function drawWaveform(pairs: PeakPair[]) {
+    const rect = waveformCanvas.parentElement!.getBoundingClientRect();
+    waveformCanvas.width = rect.width * devicePixelRatio;
+    waveformCanvas.height = rect.height * devicePixelRatio;
+    const c = waveformCanvas.getContext('2d')!;
+    c.scale(devicePixelRatio, devicePixelRatio);
+    const w = rect.width, h = rect.height, mid = h / 2;
+    const barWidth = w / pairs.length;
+    c.clearRect(0, 0, w, h);
+    for (let i = 0; i < pairs.length; i++) {
+      const { min, max } = pairs[i]!;
+      c.fillStyle = 'rgba(99, 102, 241, 0.6)';
+      c.fillRect(i * barWidth, mid - max * mid, barWidth - 0.5, (max - min) * mid);
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    if (peaks.length > 0) drawWaveform(peaks);
+  });
+
+  waveformCanvas.parentElement!.addEventListener('click', (e) => {
+    if (!currentPlayback || !currentBuffer) return;
+    const rect = waveformCanvas.parentElement!.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    currentPlayback.seek(ratio * currentBuffer.duration);
+  });
+
+  btnPlay.addEventListener('click', async () => {
+    await player.ensureRunning();
+    initNodes();
+    if (!currentBuffer) return;
+    if (currentPlayback && currentPlayback.getState() === 'playing') {
+      currentPlayback.pause();
+      setTransportState('paused');
+      return;
+    }
+    if (currentPlayback && currentPlayback.getState() === 'paused') {
+      currentPlayback.resume();
+      setTransportState('playing');
+      return;
+    }
+    if (currentPlayback) currentPlayback.dispose();
+    if (stopFrameLoop) stopFrameLoop();
+
+    currentPlayback = player.play(currentBuffer, {
+      through: [gainNode!],
+      playbackRate: Number(speedInput.value),
+      preservePitch: preservePitch.checked,
+    });
+    setTransportState('playing');
+    updateStretcherVisibility();
+
+    stopFrameLoop = player.onFrame(currentPlayback, (snapshot) => {
+      waveformCursor.style.left = `${snapshot.progress * 100}%`;
+      timeCurrent.textContent = formatTime(snapshot.position);
+      if (snapshot.state === 'playing') setTransportState('playing');
+      else if (snapshot.state === 'paused') setTransportState('paused');
+      updateStretcherUI(snapshot.stretcher);
+    });
+
+    currentPlayback.on('ended', () => {
+      setTransportState('stopped');
+      updateStretcherVisibility();
+      waveformCursor.style.left = '0%';
+      timeCurrent.textContent = formatTime(0);
+    });
+  });
+
+  btnStop.addEventListener('click', () => {
+    if (currentPlayback) {
+      currentPlayback.stop();
+      setTransportState('stopped');
+      updateStretcherVisibility();
+      waveformCursor.style.left = '0%';
+      timeCurrent.textContent = formatTime(0);
+    }
+  });
+</script>
+
+<style>
+  @import '../../demo/style.css';
+</style>

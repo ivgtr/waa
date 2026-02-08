@@ -282,6 +282,10 @@
   gap: 0.5rem;
 }
 
+.demo-wrapper svg[hidden] {
+  display: none;
+}
+
 .demo-wrapper .btn-transport {
   position: relative;
   transition: all 0.15s ease;

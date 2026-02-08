@@ -1,11 +1,13 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import react from '@astrojs/react';
 import path from 'node:path';
 
 export default defineConfig({
   site: 'https://ivgtr.github.io',
   base: '/waa',
   integrations: [
+    react(),
     starlight({
       title: 'waa-play',
       social: {
@@ -46,7 +48,17 @@ export default defineConfig({
             { label: 'フレームワーク統合', translations: { en: 'Framework Integration', 'zh-CN': '框架集成' }, slug: 'use-cases/framework-integration' },
           ],
         },
-        { label: 'デモ', translations: { en: 'Demo', 'zh-CN': '演示' }, link: '/demo' },
+        {
+          label: 'デモ',
+          translations: { en: 'Demos', 'zh-CN': '演示' },
+          items: [
+            { label: '基本再生', translations: { en: 'Basic Playback', 'zh-CN': '基本播放' }, slug: 'demos/basic-playback' },
+            { label: 'エフェクトとフェード', translations: { en: 'Effects & Fade', 'zh-CN': '效果与淡化' }, slug: 'demos/effects-and-fade' },
+            { label: 'ビジュアライゼーション', translations: { en: 'Visualization', 'zh-CN': '可视化' }, slug: 'demos/visualization' },
+            { label: 'テンポ変更', translations: { en: 'Tempo Change', 'zh-CN': '节奏变更' }, slug: 'demos/tempo-change' },
+            { label: 'React 統合', translations: { en: 'React Integration', 'zh-CN': 'React 集成' }, slug: 'demos/react-integration' },
+          ],
+        },
       ],
     }),
   ],

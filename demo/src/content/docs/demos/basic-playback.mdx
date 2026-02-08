@@ -1,0 +1,68 @@
+---
+title: 基本再生
+description: waa-play の基本的な再生機能のインタラクティブデモ
+---
+
+import BasicPlaybackDemo from '../../../components/demo/BasicPlaybackDemo.astro';
+
+シンセサイザーで音を生成するか、オーディオファイルを読み込んで、waa-play の基本再生機能を体験できます。
+
+- 音源の生成（サイン波・ホワイトノイズ・クリック）またはファイル読み込み
+- 波形表示とシーク
+- 再生/一時停止/停止
+- 音量・パン・速度・ループの調整
+
+<BasicPlaybackDemo locale="ja" />
+
+## コード例
+
+### WaaPlayer API
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const player = new WaaPlayer();
+const buffer = player.createSineBuffer(440, 2);
+
+const gain = player.createGain(0.8);
+const panner = player.createPanner(0);
+
+const playback = player.play(buffer, {
+  through: [gain, panner],
+  loop: true,
+});
+
+playback.on("timeupdate", ({ position, duration }) => {
+  console.log(`${position.toFixed(1)}s / ${duration.toFixed(1)}s`);
+});
+
+playback.pause();
+playback.resume();
+playback.seek(1.0);
+playback.setPlaybackRate(1.5);
+playback.stop();
+
+player.dispose();
+```
+
+### 関数 API（BYO AudioContext）
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const ctx = new AudioContext({ sampleRate: 48000 });
+const player = new WaaPlayer(ctx);
+
+const buffer = await player.load("/drums.mp3");
+const gain = player.createGain(0.8);
+const comp = player.createCompressor({ ratio: 4 });
+
+const a = player.play(buffer, { through: [gain, comp] });
+
+a.on("ended", () => {
+  player.play(buffer, { through: [gain, comp] });
+});
+
+player.dispose();
+ctx.close();
+```

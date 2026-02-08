@@ -1,0 +1,272 @@
+---
+import { t } from '../../i18n/translations';
+import type { Locale } from '../../i18n/translations';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<div
+  class="demo-wrapper not-content"
+  id="viz-demo"
+  data-i18n-pause={t(locale, 'playback.pause')}
+  data-i18n-play={t(locale, 'playback.play')}
+>
+  <!-- Sound Source -->
+  <section class="card">
+    <h2>{t(locale, 'source.title')}</h2>
+    <div class="source-controls">
+      <div class="synth-controls">
+        <div class="synth-params">
+          <label class="synth-label">
+            <span class="label-text">{t(locale, 'source.type')}</span>
+            <select id="viz-synth-type">
+              <option value="sine">{t(locale, 'source.sine')}</option>
+              <option value="noise">{t(locale, 'source.noise')}</option>
+              <option value="click">{t(locale, 'source.click')}</option>
+            </select>
+          </label>
+          <label class="synth-label">
+            <span class="label-text">{t(locale, 'source.frequency')}</span>
+            <input type="range" id="viz-synth-freq" min="50" max="2000" value="440" />
+            <span id="viz-synth-freq-val" class="range-value">440 Hz</span>
+          </label>
+        </div>
+        <button id="viz-btn-generate" class="btn btn-primary">{t(locale, 'source.generate')}</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Waveform -->
+  <section class="card" id="viz-waveform-section" hidden>
+    <h2>{t(locale, 'waveform.title')}</h2>
+    <div class="control-params" style="margin-bottom: 0.75rem;">
+      <label class="control-label">
+        {t(locale, 'demo.viz.resolution')}
+        <input type="range" id="viz-resolution" min="50" max="500" step="10" value="300" />
+        <span id="viz-resolution-val" class="range-value">300</span>
+      </label>
+    </div>
+    <div class="waveform-container">
+      <canvas id="viz-waveform-canvas"></canvas>
+      <div id="viz-waveform-cursor" class="waveform-cursor"></div>
+    </div>
+  </section>
+
+  <!-- Frequency Visualizer -->
+  <section class="card" id="viz-freq-section" hidden>
+    <h2>{t(locale, 'visualizer.title')}</h2>
+    <div class="transport-buttons" style="margin-bottom: 0.75rem;">
+      <button id="viz-btn-play" class="btn btn-icon btn-transport" data-state="stopped">
+        <svg class="icon-play" viewBox="0 0 24 24" width="20" height="20"><polygon points="6,3 20,12 6,21" fill="currentColor"/></svg>
+        <svg class="icon-pause" viewBox="0 0 24 24" width="20" height="20" hidden><rect x="5" y="3" width="4" height="18" fill="currentColor"/><rect x="15" y="3" width="4" height="18" fill="currentColor"/></svg>
+      </button>
+      <button id="viz-btn-stop" class="btn btn-icon btn-transport" disabled>
+        <svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor"/></svg>
+      </button>
+    </div>
+    <canvas id="viz-freq-canvas"></canvas>
+  </section>
+</div>
+
+<script>
+  import { getSharedPlayer } from '../../demo/shared-player';
+  import type { Playback, PeakPair } from 'waa';
+
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+  const wrapper = document.getElementById('viz-demo') as HTMLElement;
+  const i18n = {
+    pause: wrapper?.dataset.i18nPause ?? 'Pause',
+    play: wrapper?.dataset.i18nPlay ?? 'Play',
+  };
+
+  const synthType = $<HTMLSelectElement>('viz-synth-type');
+  const synthFreq = $<HTMLInputElement>('viz-synth-freq');
+  const synthFreqVal = $('viz-synth-freq-val');
+  const btnGenerate = $<HTMLButtonElement>('viz-btn-generate');
+
+  const waveformSection = $('viz-waveform-section');
+  const waveformCanvas = $<HTMLCanvasElement>('viz-waveform-canvas');
+  const waveformCursor = $('viz-waveform-cursor');
+  const resolutionInput = $<HTMLInputElement>('viz-resolution');
+  const resolutionVal = $('viz-resolution-val');
+
+  const freqSection = $('viz-freq-section');
+  const freqCanvas = $<HTMLCanvasElement>('viz-freq-canvas');
+
+  const btnPlay = $<HTMLButtonElement>('viz-btn-play');
+  const btnStop = $<HTMLButtonElement>('viz-btn-stop');
+  const iconPlay = btnPlay.querySelector('.icon-play') as SVGElement;
+  const iconPause = btnPlay.querySelector('.icon-pause') as SVGElement;
+
+  const player = getSharedPlayer();
+  let gainNode: GainNode | null = null;
+  let analyserNode: AnalyserNode | null = null;
+  let currentBuffer: AudioBuffer | null = null;
+  let currentPlayback: Playback | null = null;
+  let stopFrameLoop: (() => void) | null = null;
+  let peaks: PeakPair[] = [];
+
+  function initNodes() {
+    if (!gainNode) {
+      gainNode = player.createGain(0.8);
+      analyserNode = player.createAnalyser({ fftSize: 256 });
+      player.chain(gainNode, analyserNode!, player.ctx.destination);
+    }
+  }
+
+  function setTransportState(state: 'stopped' | 'playing' | 'paused') {
+    btnPlay.dataset.state = state;
+    if (state === 'playing') {
+      iconPlay.setAttribute('hidden', '');
+      iconPause.removeAttribute('hidden');
+      btnStop.disabled = false;
+    } else {
+      iconPause.setAttribute('hidden', '');
+      iconPlay.removeAttribute('hidden');
+      btnStop.disabled = state === 'stopped';
+    }
+  }
+
+  synthFreq.addEventListener('input', () => {
+    synthFreqVal.textContent = `${synthFreq.value} Hz`;
+  });
+
+  resolutionInput.addEventListener('input', () => {
+    const res = Number(resolutionInput.value);
+    resolutionVal.textContent = `${res}`;
+    if (currentBuffer) {
+      peaks = player.extractPeakPairs(currentBuffer, { resolution: res });
+      drawWaveform(peaks);
+    }
+  });
+
+  btnGenerate.addEventListener('click', async () => {
+    await player.ensureRunning();
+    initNodes();
+    const freq = Number(synthFreq.value);
+    const type = synthType.value;
+    let buffer: AudioBuffer;
+    switch (type) {
+      case 'noise': buffer = player.createNoiseBuffer(3); break;
+      case 'click': buffer = player.createClickBuffer(freq, 3); break;
+      default: buffer = player.createSineBuffer(freq, 3);
+    }
+    currentBuffer = buffer;
+    peaks = player.extractPeakPairs(buffer, { resolution: Number(resolutionInput.value) });
+    waveformSection.hidden = false;
+    freqSection.hidden = false;
+    drawWaveform(peaks);
+    resizeFreqCanvas();
+    setTransportState('stopped');
+  });
+
+  function drawWaveform(pairs: PeakPair[]) {
+    const rect = waveformCanvas.parentElement!.getBoundingClientRect();
+    waveformCanvas.width = rect.width * devicePixelRatio;
+    waveformCanvas.height = rect.height * devicePixelRatio;
+    const c = waveformCanvas.getContext('2d')!;
+    c.scale(devicePixelRatio, devicePixelRatio);
+    const w = rect.width, h = rect.height, mid = h / 2;
+    const barWidth = w / pairs.length;
+    c.clearRect(0, 0, w, h);
+    for (let i = 0; i < pairs.length; i++) {
+      const { min, max } = pairs[i]!;
+      c.fillStyle = 'rgba(99, 102, 241, 0.6)';
+      c.fillRect(i * barWidth, mid - max * mid, barWidth - 0.5, (max - min) * mid);
+    }
+  }
+
+  function resizeFreqCanvas() {
+    const rect = freqCanvas.parentElement!.getBoundingClientRect();
+    freqCanvas.width = rect.width * devicePixelRatio;
+    freqCanvas.height = 120 * devicePixelRatio;
+  }
+
+  function drawVisualizer() {
+    if (!analyserNode) return;
+    const c = freqCanvas.getContext('2d')!;
+    const rect = freqCanvas.parentElement!.getBoundingClientRect();
+    const w = rect.width, h = 120;
+    if (freqCanvas.width !== w * devicePixelRatio) {
+      freqCanvas.width = w * devicePixelRatio;
+      freqCanvas.height = h * devicePixelRatio;
+    }
+    c.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    const data = player.getFrequencyDataByte(analyserNode);
+    const barWidth = w / data.length;
+    c.clearRect(0, 0, w, h);
+    for (let i = 0; i < data.length; i++) {
+      const value = data[i]! / 255;
+      const barHeight = value * h;
+      const hue = 240 + value * 60;
+      c.fillStyle = `hsla(${hue}, 70%, 60%, 0.8)`;
+      c.fillRect(i * barWidth, h - barHeight, barWidth - 1, barHeight);
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    if (peaks.length > 0) drawWaveform(peaks);
+    resizeFreqCanvas();
+  });
+
+  btnPlay.addEventListener('click', async () => {
+    await player.ensureRunning();
+    initNodes();
+    if (!currentBuffer) return;
+    if (currentPlayback && currentPlayback.getState() === 'playing') {
+      currentPlayback.pause();
+      setTransportState('paused');
+      return;
+    }
+    if (currentPlayback && currentPlayback.getState() === 'paused') {
+      currentPlayback.resume();
+      setTransportState('playing');
+      return;
+    }
+    if (currentPlayback) currentPlayback.dispose();
+    if (stopFrameLoop) stopFrameLoop();
+
+    currentPlayback = player.play(currentBuffer, {
+      through: [gainNode!],
+      loop: true,
+    });
+    setTransportState('playing');
+
+    stopFrameLoop = player.onFrame(currentPlayback, (snapshot) => {
+      waveformCursor.style.left = `${snapshot.progress * 100}%`;
+      if (analyserNode) drawVisualizer();
+      if (snapshot.state === 'playing') setTransportState('playing');
+      else if (snapshot.state === 'paused') setTransportState('paused');
+    });
+
+    currentPlayback.on('ended', () => {
+      setTransportState('stopped');
+      waveformCursor.style.left = '0%';
+    });
+  });
+
+  btnStop.addEventListener('click', () => {
+    if (currentPlayback) {
+      currentPlayback.stop();
+      setTransportState('stopped');
+      waveformCursor.style.left = '0%';
+    }
+  });
+</script>
+
+<style>
+  @import '../../demo/style.css';
+
+  #viz-freq-canvas {
+    width: 100%;
+    height: 120px;
+    display: block;
+    background: var(--bg, #0f1117);
+    border-radius: 8px;
+  }
+</style>
