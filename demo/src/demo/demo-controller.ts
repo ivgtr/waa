@@ -112,6 +112,7 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
   let stopFrameLoop: (() => void) | null = null;
   let peaks: PeakPair[] = [];
   let throughNode: AudioNode | null = null;
+  let pendingSeekPosition: number | null = null;
 
   // Diff-based frame update tracking
   let prevProgress = -1;
@@ -131,6 +132,7 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
     if (currentPlayback) { currentPlayback.dispose(); currentPlayback = null; }
     if (stopFrameLoop) { stopFrameLoop(); stopFrameLoop = null; }
     currentBuffer = buffer;
+    pendingSeekPosition = null;
 
     if (waveformEnabled && waveformCanvas) {
       peaks = player.extractPeakPairs(buffer, { resolution: waveformResolution });
@@ -153,6 +155,7 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
     prevProgress = -1;
     prevTimeText = '';
     prevState = '';
+    pendingSeekPosition = null;
   }
 
   /* ── Synth param listeners ────────────────────────────────── */
@@ -204,11 +207,19 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
       const container = waveformCanvas.closest('.waveform-container');
       if (container) {
         on(container, 'click', (e: Event) => {
-          if (!currentPlayback || !currentBuffer) return;
+          if (!currentBuffer) return;
           const mouseEvent = e as MouseEvent;
           const rect = container.getBoundingClientRect();
           const ratio = (mouseEvent.clientX - rect.left) / rect.width;
-          currentPlayback.seek(ratio * currentBuffer.duration);
+          const position = ratio * currentBuffer.duration;
+
+          if (currentPlayback && (currentPlayback.getState() === 'playing' || currentPlayback.getState() === 'paused')) {
+            currentPlayback.seek(position);
+          } else {
+            pendingSeekPosition = position;
+            if (waveformCursor) waveformCursor.style.left = `${ratio * 100}%`;
+            if (waveformShowTime && timeCurrent) timeCurrent.textContent = formatTime(position);
+          }
         });
       }
     }
@@ -239,7 +250,9 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
       const playOpts = {
         through: [node],
         ...getPlayOptions?.(),
+        ...(pendingSeekPosition !== null ? { offset: pendingSeekPosition } : {}),
       };
+      pendingSeekPosition = null;
       currentPlayback = player.play(currentBuffer, playOpts as Parameters<typeof player.play>[1]);
       setTransportState('playing', transport, i18n);
 

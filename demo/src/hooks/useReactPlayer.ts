@@ -27,6 +27,7 @@ export interface UseReactPlayerReturn {
   handleStop: () => void;
   handleSeek: (ratio: number) => void;
   handleLoopToggle: () => void;
+  seekedPosition: number | null;
 }
 
 export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
@@ -45,6 +46,8 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
   const [fileName, setFileName] = useState('');
   const [fileLoading, setFileLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingSeekRef = useRef<number | null>(null);
+  const [seekedPosition, setSeekedPosition] = useState<number | null>(null);
 
   const snap = usePlaybackSnapshot(playback);
   const peaks = useMemo(
@@ -59,6 +62,8 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
       playback.stop();
     }
     setPlayback(null);
+    pendingSeekRef.current = null;
+    setSeekedPosition(null);
     let buf: AudioBuffer;
     switch (synthType) {
       case 'noise': buf = p.createNoiseBuffer(synthDur); break;
@@ -80,6 +85,8 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
         playback.stop();
       }
       setPlayback(null);
+      pendingSeekRef.current = null;
+      setSeekedPosition(null);
       const buf = await p.loadFromBlob(file);
       setBuffer(buf);
       setFileName(file.name);
@@ -97,7 +104,10 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
       if (playback) {
         playback.dispose();
       }
-      const pb = p.play(buffer, { loop });
+      const offset = pendingSeekRef.current;
+      pendingSeekRef.current = null;
+      setSeekedPosition(null);
+      const pb = p.play(buffer, { loop, ...(offset !== null ? { offset } : {}) });
       setPlayback(pb);
     } else {
       playback.togglePlayPause();
@@ -108,11 +118,18 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
     if (playback) {
       playback.stop();
     }
+    pendingSeekRef.current = null;
+    setSeekedPosition(null);
   }
 
   function handleSeek(ratio: number) {
-    if (playback && buffer) {
-      playback.seek(ratio * buffer.duration);
+    if (!buffer) return;
+    const position = ratio * buffer.duration;
+    if (playback && (playback.getState() === 'playing' || playback.getState() === 'paused')) {
+      playback.seek(position);
+    } else {
+      pendingSeekRef.current = position;
+      setSeekedPosition(position);
     }
   }
 
@@ -146,5 +163,6 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
     handleStop,
     handleSeek,
     handleLoopToggle,
+    seekedPosition,
   };
 }

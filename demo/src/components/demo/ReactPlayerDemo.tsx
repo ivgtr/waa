@@ -70,6 +70,7 @@ export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
     handleStop,
     handleSeek,
     handleLoopToggle,
+    seekedPosition,
   } = useReactPlayer(locale);
 
   return (
@@ -120,9 +121,9 @@ export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
         <>
           <section className="card">
             <h2>{t(locale, 'waveform.title')}</h2>
-            <Waveform peaks={peaks} progress={snap?.progress ?? 0} onSeek={handleSeek} />
+            <Waveform peaks={peaks} progress={seekedPosition !== null && buffer ? seekedPosition / buffer.duration : (snap?.progress ?? 0)} onSeek={handleSeek} />
             <div className="time-display">
-              <span>{formatTime(snap?.position ?? 0)}</span>
+              <span>{formatTime(seekedPosition ?? snap?.position ?? 0)}</span>
               <span>{formatTime(snap?.duration ?? 0)}</span>
             </div>
           </section>
