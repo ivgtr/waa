@@ -82,6 +82,12 @@
         "types": "./dist/stretcher.d.ts",
         "default": "./dist/stretcher.js"
       }
+    },
+    "./player": {
+      "import": {
+        "types": "./dist/player.d.ts",
+        "default": "./dist/player.js"
+      }
     }
   },
   "sideEffects": false,

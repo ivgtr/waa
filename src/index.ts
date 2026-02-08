@@ -81,3 +81,7 @@ export {
   whenEnded,
   whenPosition,
 } from "./adapters.js";
+
+// M11: Player (class-based API)
+export { WaaPlayer } from "./player.js";
+export type { WaaPlayerOptions } from "./player.js";
