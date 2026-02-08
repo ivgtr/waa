@@ -1,6 +1,6 @@
 {
   "name": "waa-play",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Convenient composable building blocks for Web Audio API. Time-stretch, streaming playback, waveform extraction, BYO AudioContext, zero dependencies.",
   "type": "module",
   "main": "./dist/index.cjs",
