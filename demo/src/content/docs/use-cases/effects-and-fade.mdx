@@ -1,18 +1,18 @@
 ---
 title: エフェクトとフェード
-description: waa-play で音声エフェクトとフェード効果を実装する方法
+description: waa-play で audio effect とフェード効果を実装する方法
 ---
 
 import { Code } from '@astrojs/starlight/components';
 import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, effectChainPlayer, effectChainFn, fadeInOutPlayer, autoFadePlayer, fadeInOutFn, crossfadePlayer, crossfadeFn } from '../../../snippets/use-cases/effects-and-fade';
 
-このガイドでは、`nodes`、`fade`、`play` モジュールを使用して、音声エフェクトとフェード効果を実装する方法を説明します。
+このガイドでは、`nodes`、`fade`、`play` モジュールを使用して、audio effect とフェード効果を実装する方法を説明します。
 
 ## 使用モジュール
 
-- **nodes**: オーディオノードのファクトリー関数（`createGain`、`createPanner`、`chain` など）
+- **nodes**: Audio node のファクトリー関数（`createGain`、`createPanner`、`chain` など）
 - **fade**: フェードイン/アウト、クロスフェードユーティリティ
-- **play**: コア再生エンジン（`through` オプションでエフェクトチェーンをルーティング）
+- **play**: コア再生エンジン（`through` オプションで effect chain をルーティング）
 
 ## 1. ボリューム制御
 
@@ -42,9 +42,9 @@ import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, eff
 
 </details>
 
-## 3. エフェクトチェーン
+## 3. Effect Chain
 
-複数のエフェクトを組み合わせて、リッチなサウンド処理を実現できます。`through` に配列でノードを渡すと、自動的にチェーン接続されます。
+複数の effect を組み合わせて、リッチなサウンド処理を実現できます。`through` に配列でノードを渡すと、自動的にチェーン接続されます。
 
 <Code code={effectChainPlayer} lang="ts" />
 

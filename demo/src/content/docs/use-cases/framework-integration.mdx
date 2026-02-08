@@ -1,12 +1,12 @@
 ---
-title: フレームワーク統合
-description: React などのフレームワークとの統合パターン、Promise ベースの待機、UI アニメーション連携
+title: Framework 統合
+description: React など framework との統合パターン、Promise ベースの待機、UI アニメーション連携
 ---
 
 import { Code } from '@astrojs/starlight/components';
 import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../snippets/use-cases/framework-integration';
 
-React などのフレームワークとの統合パターンや、Promise ベースの待機、UI アニメーション連携について説明します。
+React など framework との統合パターンや、Promise ベースの待機、UI アニメーション連携について説明します。
 
 **使用モジュール**: `adapters`, `play`
 
@@ -16,7 +16,7 @@ React などのフレームワークとの統合パターンや、Promise ベー
 
 <Code code={reactHookPlayer} lang="tsx" />
 
-**解説**: `subscribeSnapshot` は `statechange`, `timeupdate`, `seek`, `ended` イベントを購読し、変更時に callback を呼びます。`getSnapshot` はイミュータブルなスナップショットを返します。この2つの関数は `useSyncExternalStore` の subscribe / getSnapshot パラメータにそのまま対応します。
+**解説**: `subscribeSnapshot` は `statechange`, `timeupdate`, `seek`, `ended` イベントを購読し、変更時に callback を呼びます。`getSnapshot` は immutable な snapshot を返します。この2つの関数は `useSyncExternalStore` の subscribe / getSnapshot パラメータにそのまま対応します。
 
 <details>
 <summary>関数 API 版</summary>
@@ -42,7 +42,7 @@ React などのフレームワークとの統合パターンや、Promise ベー
 
 ## スムーズ UI アニメーション
 
-`onFrame` で `requestAnimationFrame` ベースのスムーズなプログレスバー・シーカー更新が可能です。
+`onFrame` で `requestAnimationFrame` ベースのスムーズな progress bar・seeker 更新が可能です。
 
 <Code code={smoothAnimationPlayer} lang="ts" />
 

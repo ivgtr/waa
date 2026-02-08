@@ -1,9 +1,9 @@
 ---
 title: 関数 API
-description: ツリーシェイク可能な関数モジュール
+description: Tree-shake 可能な関数モジュール
 ---
 
-モジュールごとに整理された、ツリーシェイク可能な個別関数です。各関数は `AudioContext` を第一引数に取ります（BYO Context パターン）。
+モジュールごとに整理された、tree-shake 可能な個別関数です。各関数は `AudioContext` を第一引数に取ります（BYO Context パターン）。
 
 ```ts
 import { createContext } from "waa-play/context";
@@ -51,10 +51,10 @@ const playback = play(ctx, buffer, {
 | `loopStart` | `number` | `0` | ループ開始点（秒） |
 | `loopEnd` | `number` | `duration` | ループ終了点（秒） |
 | `playbackRate` | `number` | `1` | 再生速度倍率 |
-| `through` | `AudioNode[]` | `[]` | 経由するオーディオノード（エフェクトチェーン） |
+| `through` | `AudioNode[]` | `[]` | 経由する audio node（effect chain） |
 | `destination` | `AudioNode` | `ctx.destination` | 出力先ノード |
 | `timeupdateInterval` | `number` | `250` | `timeupdate` イベントの間隔（ms） |
-| `preservePitch` | `boolean` | `false` | 再生速度変更時にピッチを保持（stretcher エンジンを使用） |
+| `preservePitch` | `boolean` | `false` | 再生速度変更時に pitch を保持（Stretcher Engine を使用） |
 
 ### Playback メソッド
 
@@ -97,8 +97,8 @@ dispose(): void;
 | `loop` | - | 先頭にループ |
 | `statechange` | `PlaybackState` | 状態が変化 |
 | `timeupdate` | `number` | ポジション更新（`timeupdateInterval` 間隔で発火） |
-| `buffering` | - | ストレッチャーエンジンがバッファリング中 |
-| `buffered` | - | ストレッチャーエンジンのバッファリング完了 |
+| `buffering` | - | Stretcher Engine が buffering 中 |
+| `buffered` | - | Stretcher Engine の buffering 完了 |
 
 ### PlaybackSnapshot
 
@@ -156,7 +156,7 @@ now(ctx: AudioContext): number;
 
 ## buffer
 
-オーディオファイルの読み込みとデコード。
+音声ファイルの読み込みとデコード。
 
 ```ts
 import { loadBuffer, loadBufferFromBlob, loadBuffers, getBufferInfo } from "waa-play/buffer";
@@ -168,7 +168,7 @@ import { loadBuffer, loadBufferFromBlob, loadBuffers, getBufferInfo } from "waa-
 loadBuffer(ctx: AudioContext, url: string, options?: { onProgress?: (progress: number) => void }): Promise<AudioBuffer>;
 ```
 
-オーディオファイルを取得してデコードします。`onProgress`（0–1）で進捗をトラッキングできます。
+音声ファイルを取得してデコードします。`onProgress`（0–1）で進捗をトラッキングできます。
 
 ### `loadBufferFromBlob()`
 
@@ -184,7 +184,7 @@ Blob または File から AudioBuffer をデコードします。
 loadBuffers(ctx: AudioContext, map: Record<string, string>): Promise<Map<string, AudioBuffer>>;
 ```
 
-キーと URL のマップから複数のオーディオファイルを並行して読み込みます。
+キーと URL のマップから複数の音声ファイルを並行して読み込みます。
 
 ### `getBufferInfo()`
 
@@ -196,7 +196,7 @@ getBufferInfo(buffer: AudioBuffer): { duration: number; numberOfChannels: number
 
 ## nodes
 
-オーディオノードファクトリとルーティングユーティリティ。
+Audio node ファクトリとルーティングユーティリティ。
 
 ```ts
 import { createGain, rampGain, createAnalyser, createFilter, createPanner, createCompressor, chain, disconnectChain } from "waa-play/nodes";
@@ -355,7 +355,7 @@ BPM ベースのクロック。デフォルト `120` BPM。
 
 ## synth
 
-合成オーディオバッファを生成。
+合成 audio buffer を生成。
 
 ```ts
 import { createSineBuffer, createNoiseBuffer, createClickBuffer } from "waa-play/synth";
@@ -371,7 +371,7 @@ createClickBuffer(ctx: AudioContext, frequency: number, duration: number): Audio
 
 ## adapters
 
-フレームワーク統合ユーティリティ。React の `useSyncExternalStore` と互換性があります。
+Framework 統合ユーティリティ。React の `useSyncExternalStore` と互換性があります。
 
 ```ts
 import { getSnapshot, subscribeSnapshot, onFrame, whenEnded, whenPosition } from "waa-play/adapters";

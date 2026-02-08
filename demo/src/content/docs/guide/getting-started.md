@@ -1,6 +1,6 @@
 ---
 title: はじめに
-description: waa-play をインストールして、数分でオーディオ再生を始めましょう
+description: waa-play をインストールして、数分で audio 再生を始めましょう
 ---
 
 ## インストール
@@ -33,7 +33,7 @@ player.dispose();
 
 ## クイックスタート: 関数 API (BYO AudioContext)
 
-完全な制御が必要な場合は、個別の関数をインポートして自前の `AudioContext` を使用します。このアプローチは完全にツリーシェイク可能です。
+完全な制御が必要な場合は、個別の関数をインポートして自前の `AudioContext` を使用します。このアプローチは完全に tree-shake 可能です。
 
 ```ts
 import { createContext, ensureRunning, play } from "waa-play";
@@ -46,23 +46,23 @@ const buffer = createSineBuffer(ctx, 440, 2);
 const pb = play(ctx, buffer);
 ```
 
-すべての関数が `AudioContext` を第一引数に取るため、隠れたグローバルステートは一切ありません。
+すべての関数が `AudioContext` を第一引数に取るため、隠れた global state は一切ありません。
 
 ## モジュール
 
-waa-play は 12 の独立モジュールで構成されています。各モジュールは個別のエントリポイントなので、バンドラーは未使用のコードをツリーシェイクできます。
+waa-play は 12 の独立モジュールで構成されています。各モジュールは個別のエントリポイントなので、バンドラーは未使用のコードを tree-shake できます。
 
 | モジュール | インポート | 用途 |
 |---|---|---|
 | **player** | `waa-play` | `WaaPlayer` クラス — 全モジュールのコンビニエンスラッパー |
 | **context** | `waa-play/context` | AudioContext ライフサイクル (`createContext`, `ensureRunning`, `now`) |
-| **buffer** | `waa-play/buffer` | オーディオファイル読み込み (`loadBuffer`, `loadBufferFromBlob`) |
+| **buffer** | `waa-play/buffer` | 音声ファイル読み込み (`loadBuffer`, `loadBufferFromBlob`) |
 | **play** | `waa-play/play` | コア再生エンジン — `Playback` ハンドルを返す |
 | **emitter** | `waa-play/emitter` | 型安全イベントエミッター (`createEmitter<Events>()`) |
-| **nodes** | `waa-play/nodes` | オーディオノードファクトリ、`chain()` / `disconnectChain()` |
+| **nodes** | `waa-play/nodes` | Audio node ファクトリ、`chain()` / `disconnectChain()` |
 | **waveform** | `waa-play/waveform` | `AudioBuffer` からのピーク / RMS 抽出 |
 | **fade** | `waa-play/fade` | フェードイン、フェードアウト、クロスフェードユーティリティ |
 | **scheduler** | `waa-play/scheduler` | 先読みスケジューラとクロック |
 | **synth** | `waa-play/synth` | バッファ合成 (サイン波、ノイズ、クリック) |
-| **adapters** | `waa-play/adapters` | フレームワーク統合 (`getSnapshot`, `subscribeSnapshot`, `onFrame`) |
-| **stretcher** | `waa-play/stretcher` | WSOLA ベースのピッチ保持タイムストレッチ |
+| **adapters** | `waa-play/adapters` | Framework 統合 (`getSnapshot`, `subscribeSnapshot`, `onFrame`) |
+| **stretcher** | `waa-play/stretcher` | WSOLA ベースの pitch 保持 time-stretch |

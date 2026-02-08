@@ -75,7 +75,7 @@ AudioContext の現在時刻（`ctx.currentTime`）を返します。
 load(url: string, options?: LoadBufferOptions): Promise<AudioBuffer>;
 ```
 
-URL からオーディオファイルを取得してデコードします。
+URL から音声ファイルを取得してデコードします。
 
 ```ts
 const buffer = await player.load("/audio/track.mp3", {
@@ -97,7 +97,7 @@ loadFromBlob(blob: Blob): Promise<AudioBuffer>;
 loadAll(map: Record<string, string>): Promise<Map<string, AudioBuffer>>;
 ```
 
-複数のオーディオファイルを並行して読み込みます。
+複数の音声ファイルを並行して読み込みます。
 
 ```ts
 const buffers = await player.loadAll({
@@ -192,7 +192,7 @@ getFrequencyDataByte(analyser: AnalyserNode): Uint8Array;
 chain(...nodes: AudioNode[]): void;
 ```
 
-オーディオノードを直列に接続します。
+Audio node を直列に接続します。
 
 ### `disconnectChain()`
 

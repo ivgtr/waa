@@ -10,13 +10,13 @@ import { tempoChangePlayer, tempoChangeFn, bufferingMonitorPlayer, bufferingMoni
 
 **使用モジュール**: `play`, `scheduler`, `synth`
 
-## 1. ピッチ保存テンポ変更
+## 1. Pitch 保存テンポ変更
 
 `preservePitch` のデフォルトは `true` なので、通常の `play()` 呼び出しでピッチが保存されます。通常速度変更（ピッチも変わる）には `preservePitch: false` を明示します。
 
 <Code code={tempoChangePlayer} lang="ts" />
 
-WSOLA アルゴリズムにより、ピッチを変えずにテンポを変更できます。`preservePitch: true`（デフォルト）で WSOLA ベースのタイムストレッチが有効になります。
+WSOLA アルゴリズムにより、ピッチを変えずにテンポを変更できます。`preservePitch: true`（デフォルト）で WSOLA ベースの time-stretch が有効になります。
 
 <details>
 <summary>関数 API 版</summary>
@@ -25,9 +25,9 @@ WSOLA アルゴリズムにより、ピッチを変えずにテンポを変更�
 
 </details>
 
-## 2. バッファリング状態の監視
+## 2. Buffering 状態の監視
 
-WSOLA 処理は非同期で行われるため、テンポ変更時にバッファリングが発生する可能性があります。
+WSOLA 処理は非同期で行われるため、テンポ変更時に buffering が発生する可能性があります。
 
 <Code code={bufferingMonitorPlayer} lang="ts" />
 
