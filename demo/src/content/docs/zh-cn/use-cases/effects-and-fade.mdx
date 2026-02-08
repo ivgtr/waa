@@ -1,0 +1,97 @@
+---
+title: 效果与淡入淡出
+description: 如何使用 waa-play 实现音频效果和淡入淡出过渡
+---
+
+import { Code } from '@astrojs/starlight/components';
+import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, effectChainPlayer, effectChainFn, fadeInOutPlayer, autoFadePlayer, fadeInOutFn, crossfadePlayer, crossfadeFn } from '../../../../snippets/use-cases/effects-and-fade';
+
+本指南演示如何使用 `nodes`、`fade` 和 `play` 模块实现音频效果和淡入淡出过渡。
+
+## 使用的模块
+
+- **nodes**: 音频节点工厂函数（`createGain`、`createPanner`、`chain` 等）
+- **fade**: 淡入/淡出和交叉淡入淡出工具
+- **play**: 核心播放引擎（通过 `through` 选项路由效果链）
+
+## 1. 音量控制
+
+使用 `createGain()` 创建 GainNode，并通过 `play()` 函数的 `through` 选项进行路由。使用 `rampGain()` 可以平滑地改变音量，不会产生爆音。
+
+<Code code={volumeControlPlayer} lang="ts" />
+
+当您将 GainNode 传递给 `through` 选项时，`play()` 会自动将音源连接到增益节点，然后再连接到目标。
+
+<details>
+<summary>函数 API 版</summary>
+
+<Code code={volumeControlFn} lang="ts" />
+
+</details>
+
+## 2. 立体声声像
+
+使用 `createPanner()` 创建 StereoPannerNode 以控制左右声像。值的范围从 `-1`（左）到 `1`（右）。
+
+<Code code={stereoPanPlayer} lang="ts" />
+
+<details>
+<summary>函数 API 版</summary>
+
+<Code code={stereoPanFn} lang="ts" />
+
+</details>
+
+## 3. 效果链
+
+组合多个效果以实现丰富的声音处理。将节点数组传递给 `through` 以自动将它们链接在一起。
+
+<Code code={effectChainPlayer} lang="ts" />
+
+使用 `through` 选项时，`play()` 会自动连接节点，因此不需要 `chain()`。在 `play()` 之外构建节点图时使用 `chain()`。
+
+<details>
+<summary>函数 API 版</summary>
+
+使用 `chain()` 显式构建节点图的示例：
+
+<Code code={effectChainFn} lang="ts" />
+
+</details>
+
+## 4. 淡入/淡出
+
+使用 `fadeIn()` 和 `fadeOut()` 实现平滑的淡入淡出效果。`autoFade()` 可以在播放开始和结束时自动淡入淡出。
+
+<Code code={fadeInOutPlayer} lang="ts" />
+
+使用 `autoFade()` 可以自动设置播放开始和结束时的淡入淡出。
+
+<Code code={autoFadePlayer} lang="ts" />
+
+<details>
+<summary>函数 API 版</summary>
+
+<Code code={fadeInOutFn} lang="ts" />
+
+</details>
+
+## 5. DJ 交叉淡入淡出
+
+在两个音轨之间交叉淡入淡出，实现无缝的 DJ 风格过渡。
+
+<Code code={crossfadePlayer} lang="ts" />
+
+`crossfade()` 同时将一个 GainNode 从 1 淡出到 0，将另一个从 0 淡入到 1。使用 `curve: "equal-power"` 可以确保在交叉淡入淡出期间音量感知均匀。
+
+<details>
+<summary>函数 API 版</summary>
+
+<Code code={crossfadeFn} lang="ts" />
+
+</details>
+
+## 相关 API
+
+- [WaaPlayer](/waa/zh-cn/api/player/)
+- [函数 API](/waa/zh-cn/api/functions/)

@@ -1,0 +1,21 @@
+---
+import { t } from '../../i18n/translations';
+import type { Locale } from '../../i18n/translations';
+
+interface Props {
+  locale: Locale;
+  prefix?: string;
+}
+
+const { locale, prefix = '' } = Astro.props;
+---
+
+<div class="transport-buttons">
+  <button id={`${prefix}btn-play-pause`} class="btn btn-icon btn-transport" title={t(locale, 'playback.play')} data-state="stopped">
+    <svg class="icon-play" viewBox="0 0 24 24" width="20" height="20"><polygon points="6,3 20,12 6,21" fill="currentColor"/></svg>
+    <svg class="icon-pause" viewBox="0 0 24 24" width="20" height="20" hidden><rect x="5" y="3" width="4" height="18" fill="currentColor"/><rect x="15" y="3" width="4" height="18" fill="currentColor"/></svg>
+  </button>
+  <button id={`${prefix}btn-stop`} class="btn btn-icon btn-transport" title={t(locale, 'playback.stop')} disabled>
+    <svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor"/></svg>
+  </button>
+</div>

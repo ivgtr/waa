@@ -1,0 +1,62 @@
+---
+title: テンポ変更とリズム
+description: テンポの変更やリズムパターンの構築など、タイミング制御のパターンを紹介します。
+---
+
+import { Code } from '@astrojs/starlight/components';
+import { tempoChangePlayer, tempoChangeFn, bufferingMonitorPlayer, bufferingMonitorFn, beatSequencerPlayer, beatSequencerFn } from '../../../snippets/use-cases/tempo-and-rhythm';
+
+テンポの変更やリズムパターンの構築など、タイミング制御のパターンを紹介します。
+
+**使用モジュール**: `play`, `scheduler`, `synth`
+
+## 1. Pitch 保存テンポ変更
+
+`preservePitch` のデフォルトは `true` なので、通常の `play()` 呼び出しでピッチが保存されます。通常速度変更（ピッチも変わる）には `preservePitch: false` を明示します。
+
+<Code code={tempoChangePlayer} lang="ts" />
+
+WSOLA アルゴリズムにより、ピッチを変えずにテンポを変更できます。`preservePitch: true`（デフォルト）で WSOLA ベースの time-stretch が有効になります。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={tempoChangeFn} lang="ts" />
+
+</details>
+
+## 2. Buffering 状態の監視
+
+WSOLA 処理は非同期で行われるため、テンポ変更時に buffering が発生する可能性があります。
+
+<Code code={bufferingMonitorPlayer} lang="ts" />
+
+`buffering` イベントの `reason` は `"initial"` | `"seek"` | `"tempo-change"` | `"underrun"` のいずれかです。`getSnapshot()` の `stretcher` フィールドで詳細な状態を取得できます。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={bufferingMonitorFn} lang="ts" />
+
+</details>
+
+## 3. ビートシーケンサー
+
+クロックとスケジューラーを使用して、正確なタイミングでビートパターンを構築できます。
+
+<Code code={beatSequencerPlayer} lang="ts" />
+
+`createClock` で BPM ベースのクロックを作成し、`createScheduler` のルックアヘッドスケジューリングでサンプル精度のタイミング制御を実現します。`createClickBuffer` でクリック音を合成できます。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={beatSequencerFn} lang="ts" />
+
+</details>
+
+## 関連 API
+
+- [WaaPlayer](/waa/api/player/)
+- [関数 API](/waa/api/functions/)
+- [Stretcher](/waa/api/stretcher/)

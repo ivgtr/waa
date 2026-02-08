@@ -1,0 +1,54 @@
+---
+title: エフェクトとフェード
+description: Gain・Filter・fade in/out の interactive デモ
+---
+
+import EffectsDemo from '../../../components/demo/EffectsDemo.astro';
+
+Audio effect chain とフェード機能のデモです。
+
+- **ゲイン**: 音量をリアルタイムに調整
+- **フィルター**: Lowpass / Highpass / Bandpass の切り替え、周波数・Q値の調整
+- **フェード**: フェードイン/アウトの実行
+
+<EffectsDemo locale="ja" />
+
+## コード例
+
+### Effect Chain
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const player = new WaaPlayer();
+const buffer = player.createSineBuffer(440, 3);
+
+const gain = player.createGain(0.8);
+
+// BiquadFilter は AudioContext から直接作成
+const filter = player.ctx.createBiquadFilter();
+filter.type = "lowpass";
+filter.frequency.value = 1000;
+filter.Q.value = 5;
+
+player.chain(gain, filter, player.ctx.destination);
+
+const playback = player.play(buffer, {
+  through: [gain],
+  loop: true,
+});
+
+// リアルタイムにパラメータを変更
+filter.frequency.value = 500;
+gain.gain.value = 0.5;
+```
+
+### フェード
+
+```ts
+// フェードイン（0 → 現在のゲイン値）
+player.fadeIn(gain, 0.5); // 0.5秒
+
+// フェードアウト（現在のゲイン値 → 0）
+player.fadeOut(gain, 1.0); // 1.0秒
+```

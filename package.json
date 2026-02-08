@@ -1,7 +1,7 @@
 {
   "name": "waa-play",
   "version": "0.1.1",
-  "description": "Composable Web Audio API utilities. BYO AudioContext. Framework-agnostic. Sample-accurate. Pitch-preserving time-stretch.",
+  "description": "Convenient composable building blocks for Web Audio API. Time-stretch, streaming playback, waveform extraction, BYO AudioContext, zero dependencies.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -82,6 +82,12 @@
         "types": "./dist/stretcher.d.ts",
         "default": "./dist/stretcher.js"
       }
+    },
+    "./player": {
+      "import": {
+        "types": "./dist/player.d.ts",
+        "default": "./dist/player.js"
+      }
     }
   },
   "sideEffects": false,
@@ -100,11 +106,10 @@
   "keywords": [
     "web-audio",
     "audio",
+    "audio-player",
     "sound",
     "webaudio",
     "audiocontext",
-    "composable",
-    "tree-shakeable",
     "time-stretch",
     "wsola",
     "playback",

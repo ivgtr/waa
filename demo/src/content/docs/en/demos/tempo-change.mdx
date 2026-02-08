@@ -1,0 +1,50 @@
+---
+title: Tempo Change
+description: Pitch-preserving time-stretch and stretcher engine demo
+---
+
+import TempoDemo from '../../../../components/demo/TempoDemo.astro';
+
+A demo of WSOLA-based pitch-preserving time-stretch.
+
+- **Tempo slider**: Change playback speed from 0.5x to 2.0x in real-time
+- **Preserve pitch**: Enable WSOLA stretcher (change speed without changing pitch)
+- **Chunk strip**: Visualize processing state of each chunk in real-time
+- **Buffer health**: Display streaming buffer health status
+
+<TempoDemo locale="en" />
+
+## Code Examples
+
+### Pitch-preserving Playback
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const player = new WaaPlayer();
+const buffer = await player.load("/music.mp3");
+
+// preservePitch: true automatically enables the WSOLA stretcher
+const playback = player.play(buffer, {
+  playbackRate: 1.5,
+  preservePitch: true,
+});
+
+// Change tempo in real-time
+playback.setPlaybackRate(0.75);
+```
+
+### Monitoring Stretcher State
+
+```ts
+import { onFrame } from "waa-play";
+
+const stop = player.onFrame(playback, (snapshot) => {
+  const { stretcher } = snapshot;
+  if (stretcher) {
+    console.log(`Buffer health: ${stretcher.bufferHealth}`);
+    console.log(`Ahead: ${stretcher.aheadSeconds.toFixed(1)}s`);
+    console.log(`Chunks: ${stretcher.chunkStates.join(", ")}`);
+  }
+});
+```

@@ -1,0 +1,50 @@
+---
+title: テンポ変更
+description: Pitch 保持 time-stretch と Stretcher Engine のデモ
+---
+
+import TempoDemo from '../../../components/demo/TempoDemo.astro';
+
+WSOLA ベースの pitch 保持 time-stretch 機能のデモです。
+
+- **テンポスライダー**: 0.5x〜2.0x でリアルタイムに再生速度を変更
+- **Pitch 保持**: チェックで WSOLA stretcher が有効化（ピッチを変えずに速度を変更）
+- **チャンクストリップ**: 各チャンクの処理状態をリアルタイムに可視化
+- **Buffer health**: ストリーミングバッファの健全性を表示
+
+<TempoDemo locale="ja" />
+
+## コード例
+
+### Pitch 保持再生
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const player = new WaaPlayer();
+const buffer = await player.load("/music.mp3");
+
+// preservePitch: true で WSOLA stretcher が自動的に有効化
+const playback = player.play(buffer, {
+  playbackRate: 1.5, // 1.5倍速
+  preservePitch: true, // ピッチを保持
+});
+
+// リアルタイムにテンポを変更
+playback.setPlaybackRate(0.75); // 0.75倍速に変更
+```
+
+### Stretcher 状態の監視
+
+```ts
+import { onFrame } from "waa-play";
+
+const stop = player.onFrame(playback, (snapshot) => {
+  const { stretcher } = snapshot;
+  if (stretcher) {
+    console.log(`Buffer health: ${stretcher.bufferHealth}`);
+    console.log(`Ahead: ${stretcher.aheadSeconds.toFixed(1)}s`);
+    console.log(`Chunks: ${stretcher.chunkStates.join(", ")}`);
+  }
+});
+```

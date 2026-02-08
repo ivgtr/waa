@@ -267,6 +267,7 @@ function createStretchedPlayback(
 ): Playback {
   const {
     offset: initialOffset = 0,
+    loop = false,
     playbackRate: initialRate = 1,
     through = [],
     destination = ctx.destination,
@@ -282,6 +283,7 @@ function createStretchedPlayback(
   let timerId: ReturnType<typeof setInterval> | null = null;
   let disposed = false;
   let currentRate = initialRate;
+  let isLooping = loop;
   let pendingSeek: number | null = null;
 
   // Emit initial play event
@@ -295,6 +297,7 @@ function createStretchedPlayback(
     engineInstance = createStretcherEngine(ctx, buffer, {
       tempo: currentRate,
       offset: initialOffset,
+      loop: isLooping,
       through,
       destination,
       timeupdateInterval,
@@ -309,6 +312,11 @@ function createStretchedPlayback(
     engineInstance.on("buffered", (data) => {
       if (disposed) return;
       emitter.emit("buffered", data);
+    });
+
+    engineInstance.on("loop", () => {
+      if (disposed) return;
+      emitter.emit("loop", undefined as never);
     });
 
     engineInstance.on("ended", () => {
@@ -424,8 +432,9 @@ function createStretchedPlayback(
     }
   }
 
-  function setLoop(_value: boolean) {
-    // Loop is not supported in stretcher mode
+  function setLoop(value: boolean) {
+    isLooping = value;
+    engineInstance?.setLoop(value);
   }
 
   function dispose() {

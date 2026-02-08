@@ -1,0 +1,68 @@
+---
+title: 基本播放
+description: waa-play 基本播放功能的交互式演示
+---
+
+import BasicPlaybackDemo from '../../../../components/demo/BasicPlaybackDemo.astro';
+
+使用合成器生成音色或加载音频文件，体验 waa-play 的基本播放功能。
+
+- 音源生成（正弦波、白噪声、脉冲）或文件加载
+- 波形显示和定位
+- 播放/暂停/停止
+- 音量、声像、速度和循环控制
+
+<BasicPlaybackDemo locale="zh-cn" />
+
+## 代码示例
+
+### WaaPlayer API
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const player = new WaaPlayer();
+const buffer = player.createSineBuffer(440, 2);
+
+const gain = player.createGain(0.8);
+const panner = player.createPanner(0);
+
+const playback = player.play(buffer, {
+  through: [gain, panner],
+  loop: true,
+});
+
+playback.on("timeupdate", ({ position, duration }) => {
+  console.log(`${position.toFixed(1)}s / ${duration.toFixed(1)}s`);
+});
+
+playback.pause();
+playback.resume();
+playback.seek(1.0);
+playback.setPlaybackRate(1.5);
+playback.stop();
+
+player.dispose();
+```
+
+### 函数 API（自带 AudioContext）
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const ctx = new AudioContext({ sampleRate: 48000 });
+const player = new WaaPlayer(ctx);
+
+const buffer = await player.load("/drums.mp3");
+const gain = player.createGain(0.8);
+const comp = player.createCompressor({ ratio: 4 });
+
+const a = player.play(buffer, { through: [gain, comp] });
+
+a.on("ended", () => {
+  player.play(buffer, { through: [gain, comp] });
+});
+
+player.dispose();
+ctx.close();
+```

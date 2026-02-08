@@ -1,0 +1,61 @@
+---
+title: Visualization
+description: Audio visualization patterns including waveform rendering and real-time frequency display
+---
+
+import { Code } from '@astrojs/starlight/components';
+import { staticWaveformPlayer, staticWaveformFn, playbackCursorPlayer, playbackCursorFn, realtimeFrequencyPlayer, realtimeFrequencyFn } from '../../../../snippets/use-cases/visualization';
+
+This guide covers three patterns for visualizing audio data: static waveform rendering, playback cursor tracking, and real-time frequency spectrum display.
+
+**Modules used**: `waveform`, `nodes`, `adapters`, `play`
+
+## 1. Static Waveform Rendering
+
+Extract peak pairs from an AudioBuffer and render the waveform to a Canvas.
+
+<Code code={staticWaveformPlayer} lang="ts" />
+
+`extractPeakPairs` extracts min/max pairs from an AudioBuffer. Control the number of output data points with the `resolution` parameter.
+
+<details>
+<summary>Function API</summary>
+
+<Code code={staticWaveformFn} lang="ts" />
+
+</details>
+
+## 2. Playback Cursor Tracking
+
+Move a cursor according to playback position and color-code the played portion.
+
+<Code code={playbackCursorPlayer} lang="ts" />
+
+`onFrame` returns a `PlaybackSnapshot` on every frame using `requestAnimationFrame`. Calculate cursor position using `progress` (0–1).
+
+<details>
+<summary>Function API</summary>
+
+<Code code={playbackCursorFn} lang="ts" />
+
+</details>
+
+## 3. Real-Time Frequency Display
+
+Use an AnalyserNode to display the frequency spectrum in real-time during playback.
+
+<Code code={realtimeFrequencyPlayer} lang="ts" />
+
+`createAnalyser` creates an AnalyserNode and routes it via `through`. `getFrequencyDataByte` returns frequency data as a Uint8Array (0-255).
+
+<details>
+<summary>Function API</summary>
+
+<Code code={realtimeFrequencyFn} lang="ts" />
+
+</details>
+
+## Related API
+
+- [WaaPlayer](/waa/api/player/)
+- [Function API](/waa/api/functions/)

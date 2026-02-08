@@ -1,0 +1,62 @@
+---
+title: Tempo & Rhythm
+description: Patterns for timing control including tempo changes and rhythm pattern construction.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import { tempoChangePlayer, tempoChangeFn, bufferingMonitorPlayer, bufferingMonitorFn, beatSequencerPlayer, beatSequencerFn } from '../../../../snippets/use-cases/tempo-and-rhythm';
+
+Patterns for timing control including tempo changes and rhythm pattern construction.
+
+**Modules used**: `play`, `scheduler`, `synth`
+
+## 1. Pitch-Preserving Tempo Change
+
+Since `preservePitch` defaults to `true`, pitch is preserved by default in normal `play()` calls. For regular speed changes (where pitch also changes), explicitly set `preservePitch: false`.
+
+<Code code={tempoChangePlayer} lang="ts" />
+
+The WSOLA algorithm allows you to change tempo without changing pitch. Setting `preservePitch: true` (default) enables WSOLA-based time stretching.
+
+<details>
+<summary>Function API</summary>
+
+<Code code={tempoChangeFn} lang="ts" />
+
+</details>
+
+## 2. Monitoring Buffering State
+
+Since WSOLA processing is asynchronous, buffering may occur when changing tempo.
+
+<Code code={bufferingMonitorPlayer} lang="ts" />
+
+The `reason` in the `buffering` event is one of `"initial"` | `"seek"` | `"tempo-change"` | `"underrun"`. You can get detailed state information via the `stretcher` field in `getSnapshot()`.
+
+<details>
+<summary>Function API</summary>
+
+<Code code={bufferingMonitorFn} lang="ts" />
+
+</details>
+
+## 3. Beat Sequencer
+
+You can build beat patterns with precise timing using clocks and schedulers.
+
+<Code code={beatSequencerPlayer} lang="ts" />
+
+Create a BPM-based clock with `createClock` and achieve sample-accurate timing control with lookahead scheduling via `createScheduler`. You can synthesize click sounds with `createClickBuffer`.
+
+<details>
+<summary>Function API</summary>
+
+<Code code={beatSequencerFn} lang="ts" />
+
+</details>
+
+## Related API
+
+- [WaaPlayer](/waa/api/player/)
+- [Function API](/waa/api/functions/)
+- [Stretcher](/waa/api/stretcher/)

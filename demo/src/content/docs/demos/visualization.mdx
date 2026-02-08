@@ -1,0 +1,54 @@
+---
+title: Visualization
+description: 波形表示とリアルタイム frequency visualizer のデモ
+---
+
+import VisualizationDemo from '../../../components/demo/VisualizationDemo.astro';
+
+波形データの抽出とリアルタイム周波数分析のデモです。
+
+- **波形表示**: `extractPeakPairs()` でピーク/RMS データを抽出し、Canvas に描画
+- **解像度調整**: スライダーで波形の解像度をリアルタイムに変更
+- **Frequency Visualizer**: AnalyserNode を使ったリアルタイム周波数分析
+
+<VisualizationDemo locale="ja" />
+
+## コード例
+
+### 波形データの抽出
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const player = new WaaPlayer();
+const buffer = player.createSineBuffer(440, 2);
+
+// ピークペアを抽出（resolution = バーの数）
+const peaks = player.extractPeakPairs(buffer, { resolution: 300 });
+
+// Canvas に描画
+const canvas = document.querySelector("canvas")!;
+const ctx = canvas.getContext("2d")!;
+const w = canvas.width, h = canvas.height, mid = h / 2;
+const barWidth = w / peaks.length;
+
+for (let i = 0; i < peaks.length; i++) {
+  const { min, max } = peaks[i];
+  ctx.fillStyle = "rgba(99, 102, 241, 0.6)";
+  ctx.fillRect(i * barWidth, mid - max * mid, barWidth - 0.5, (max - min) * mid);
+}
+```
+
+### リアルタイム周波数分析
+
+```ts
+const analyser = player.createAnalyser({ fftSize: 256 });
+player.chain(gain, analyser, player.ctx.destination);
+
+// フレームループで周波数データを取得
+const stop = player.onFrame(playback, () => {
+  const data = player.getFrequencyDataByte(analyser);
+  // data は Uint8Array — 各要素が 0-255 の周波数ビンの値
+  drawBars(data);
+});
+```

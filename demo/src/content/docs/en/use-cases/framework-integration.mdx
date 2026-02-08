@@ -1,0 +1,63 @@
+---
+title: Framework Integration
+description: Integration patterns with frameworks like React, Promise-based waiting, and UI animation synchronization
+---
+
+import { Code } from '@astrojs/starlight/components';
+import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../../snippets/use-cases/framework-integration';
+
+This guide covers integration patterns with frameworks like React, Promise-based waiting, and UI animation synchronization.
+
+**Modules used**: `adapters`, `play`
+
+## React Custom Hook
+
+`subscribeSnapshot` and `getSnapshot` are directly compatible with React's `useSyncExternalStore`.
+
+<Code code={reactHookPlayer} lang="tsx" />
+
+**Explanation**: `subscribeSnapshot` subscribes to `statechange`, `timeupdate`, `seek`, and `ended` events, invoking the callback on changes. `getSnapshot` returns an immutable snapshot. These two functions map directly to the subscribe / getSnapshot parameters of `useSyncExternalStore`.
+
+<details>
+<summary>Function API</summary>
+
+<Code code={reactHookFn} lang="tsx" />
+
+</details>
+
+## Promise-Based Waiting
+
+You can wait for playback completion or position arrival using Promises.
+
+<Code code={promiseWaitPlayer} lang="ts" />
+
+**Explanation**: `whenEnded` returns a Promise that resolves on the `ended` event (natural completion). It does not resolve on manual `stop()`. `whenPosition` monitors the `timeupdate` event and resolves when the specified position is reached (or exceeded).
+
+<details>
+<summary>Function API</summary>
+
+<Code code={promiseWaitFn} lang="ts" />
+
+</details>
+
+## Smooth UI Animation
+
+`onFrame` enables smooth progress bar and seeker updates based on `requestAnimationFrame`.
+
+<Code code={smoothAnimationPlayer} lang="ts" />
+
+**Explanation**: `onFrame` manages a `requestAnimationFrame` loop internally, passing a `PlaybackSnapshot` to the callback every frame. Calling the returned function stops the loop. This provides smoother updates than `timeupdate` (setInterval-based, default 50ms).
+
+**Difference from `timeupdate` event**: `timeupdate` is setInterval-based and works in background tabs. `onFrame` is requestAnimationFrame-based, ideal for visual updates but pauses in the background.
+
+<details>
+<summary>Function API</summary>
+
+<Code code={smoothAnimationFn} lang="ts" />
+
+</details>
+
+## Related API
+
+- [WaaPlayer](/waa/api/player/)
+- [Function API](/waa/api/functions/)

@@ -1,0 +1,53 @@
+---
+title: Effects & Fade
+description: Interactive demo of gain, filter, and fade in/out
+---
+
+import EffectsDemo from '../../../../components/demo/EffectsDemo.astro';
+
+A demo of audio effect chains and fade functionality.
+
+- **Gain**: Adjust volume in real-time
+- **Filter**: Switch between Lowpass / Highpass / Bandpass, adjust frequency and Q
+- **Fade**: Execute fade in/out
+
+<EffectsDemo locale="en" />
+
+## Code Examples
+
+### Effect Chain
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const player = new WaaPlayer();
+const buffer = player.createSineBuffer(440, 3);
+
+const gain = player.createGain(0.8);
+
+const filter = player.ctx.createBiquadFilter();
+filter.type = "lowpass";
+filter.frequency.value = 1000;
+filter.Q.value = 5;
+
+player.chain(gain, filter, player.ctx.destination);
+
+const playback = player.play(buffer, {
+  through: [gain],
+  loop: true,
+});
+
+// Modify parameters in real-time
+filter.frequency.value = 500;
+gain.gain.value = 0.5;
+```
+
+### Fade
+
+```ts
+// Fade in (0 → current gain value)
+player.fadeIn(gain, 0.5); // 0.5 seconds
+
+// Fade out (current gain value → 0)
+player.fadeOut(gain, 1.0); // 1.0 seconds
+```

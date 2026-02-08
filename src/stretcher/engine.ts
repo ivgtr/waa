@@ -71,6 +71,7 @@ export function createStretcherEngine(
   const {
     tempo: initialTempo,
     offset = 0,
+    loop: initialLoop = false,
     through = [],
     destination = ctx.destination,
   } = options;
@@ -82,6 +83,7 @@ export function createStretcherEngine(
   // State
   let phase: StretcherPlaybackState = "waiting";
   let currentTempo = initialTempo;
+  let isLooping = initialLoop;
   let disposed = false;
   let bufferingStartTime = 0;
   let currentChunkIndex = 0;
@@ -310,6 +312,20 @@ export function createStretcherEngine(
   function advanceToNextChunk(): void {
     const nextIdx = currentChunkIndex + 1;
     if (nextIdx >= chunks.length) {
+      if (isLooping) {
+        currentChunkIndex = 0;
+        scheduler.handleSeek(0);
+        const chunk = chunks[0];
+        if (chunk && chunk.state === "ready") {
+          playCurrentChunk();
+        } else {
+          bufferingResumePosition = 0;
+          enterBuffering("seek");
+        }
+        emitter.emit("loop", undefined as never);
+        evictDistantChunks();
+        return;
+      }
       // Reached the end
       phase = "ended";
       chunkPlayer.stop();
@@ -528,10 +544,10 @@ export function createStretcherEngine(
 
     const chunk = chunks[currentChunkIndex];
     if (chunk && chunk.state === "ready") {
+      const resumePosition = chunkPlayer.getCurrentPosition();
       phase = "playing";
       chunkPlayer.resume();
-      // Re-start from paused position
-      playCurrentChunk(chunkPlayer.getCurrentPosition());
+      playCurrentChunk(resumePosition);
     } else {
       enterBuffering("underrun");
     }
@@ -577,6 +593,10 @@ export function createStretcherEngine(
     chunkPlayer.stop();
   }
 
+  function setLoop(value: boolean): void {
+    isLooping = value;
+  }
+
   function setTempo(newTempo: number): void {
     if (disposed || phase === "ended" || newTempo === currentTempo) return;
     bufferingResumePosition = getPositionInOriginalBuffer();
@@ -603,6 +623,7 @@ export function createStretcherEngine(
     seek,
     stop,
     setTempo,
+    setLoop,
     getCurrentPosition: getPositionInOriginalBuffer,
     getStatus,
     getSnapshot,

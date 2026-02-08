@@ -1,0 +1,24 @@
+---
+title: React 統合
+description: React で waa-play を使用するインタラクティブデモ
+---
+
+import ReactPlayerDemo from '../../../components/demo/ReactPlayerDemo.tsx';
+import { Code } from '@astrojs/starlight/components';
+import { reactPlayerDemo } from '../../../snippets/demos/react-integration';
+
+React で waa-play を使用する実動デモです。`useSyncExternalStore` と `subscribeSnapshot` / `getSnapshot` を使って、再生状態をリアクティブに管理します。
+
+<ReactPlayerDemo client:load locale="ja" />
+
+## ソースコード
+
+このデモのコアロジックです。UI の描画コードは省略しています。
+
+<Code code={reactPlayerDemo} lang="tsx" />
+
+## ポイント
+
+- **`usePlaybackSnapshot`**: `useSyncExternalStore` + `subscribeSnapshot` / `getSnapshot` をラップした汎用 hook。Playback の状態を React ステートとして購読
+- **`useReactPlayer`**: プレーヤーのライフサイクル（WaaPlayer 管理、バッファ生成/読み込み、再生制御）を単一の hook に集約し、コンポーネントをビューのみに保つ
+- **BYO AudioContext**: `WaaPlayer` が内部で AudioContext を管理。`ensureRunning()` でユーザージェスチャ後に resume

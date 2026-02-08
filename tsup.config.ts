@@ -14,6 +14,7 @@ export default defineConfig({
     synth: "src/synth.ts",
     adapters: "src/adapters.ts",
     stretcher: "src/stretcher/index.ts",
+    player: "src/player.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

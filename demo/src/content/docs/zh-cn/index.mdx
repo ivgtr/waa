@@ -1,0 +1,35 @@
+---
+title: waa-play
+description: 可组合 & 开箱即用的 Web Audio API 工具包
+template: splash
+hero:
+  title: waa-play
+  tagline: 可组合 & 开箱即用的 Web Audio API 工具包
+  actions:
+    - text: 快速开始
+      link: /waa/zh-cn/guide/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: 在线演示
+      link: /waa/zh-cn/demos/basic-playback/
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## 功能特性
+
+<CardGrid>
+  <Card title="保持音高的时间拉伸" icon="rocket">
+    基于 WSOLA 的流式播放,支持实时变速。处理在独立线程中运行。
+  </Card>
+  <Card title="自带 AudioContext" icon="setting">
+    每个函数都以 AudioContext 作为第一个参数。没有隐藏的全局状态。
+  </Card>
+  <Card title="支持 Tree-shaking" icon="seti:json">
+    11 个独立模块,各有独立入口点。只导入你需要的部分。
+  </Card>
+  <Card title="框架适配器" icon="puzzle">
+    内置基于快照的集成方案,支持 React、Vue、Svelte 及任何框架。
+  </Card>
+</CardGrid>

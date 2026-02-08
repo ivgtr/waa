@@ -1,0 +1,136 @@
+---
+import { t } from '../../i18n/translations';
+import type { Locale } from '../../i18n/translations';
+import SoundSourceCard from './SoundSourceCard.astro';
+import TransportButtons from './TransportButtons.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<div
+  class="demo-wrapper not-content"
+  id="viz-demo"
+  data-i18n-pause={t(locale, 'playback.pause')}
+  data-i18n-play={t(locale, 'playback.play')}
+  data-i18n-loading={t(locale, 'source.loading')}
+  data-i18n-load-failed={t(locale, 'source.load-failed')}
+  data-i18n-load-file={t(locale, 'source.load-file')}
+>
+  <SoundSourceCard locale={locale} prefix="viz-" durMin={1} durMax={10} durDefault={3} />
+
+  <!-- Waveform -->
+  <section class="card" id="viz-waveform-section" hidden>
+    <h2>{t(locale, 'waveform.title')}</h2>
+    <div class="control-params" style="margin-bottom: 0.75rem;">
+      <label class="control-label">
+        {t(locale, 'demo.viz.resolution')}
+        <input type="range" id="viz-resolution" min="50" max="500" step="10" value="300" />
+        <span id="viz-resolution-val" class="range-value">300</span>
+      </label>
+    </div>
+    <div class="waveform-container">
+      <canvas id="viz-waveform-canvas"></canvas>
+      <div id="viz-waveform-cursor" class="waveform-cursor"></div>
+    </div>
+  </section>
+
+  <!-- Frequency Visualizer -->
+  <section class="card" id="viz-freq-section" hidden>
+    <h2>{t(locale, 'visualizer.title')}</h2>
+    <div style="margin-bottom: 0.75rem;">
+      <TransportButtons locale={locale} prefix="viz-" />
+    </div>
+    <canvas id="viz-freq-canvas"></canvas>
+  </section>
+</div>
+
+<script>
+  import { createDemoController } from '../../demo/demo-controller';
+  import { $, drawWaveform } from '../../demo/demo-utils';
+
+  let analyserNode: AnalyserNode | null = null;
+  const freqCanvas = $<HTMLCanvasElement>('viz-freq-canvas');
+  const resolutionInput = $<HTMLInputElement>('viz-resolution');
+  const resolutionVal = $('viz-resolution-val');
+
+  function resizeFreqCanvas() {
+    const parent = freqCanvas.parentElement;
+    if (!parent) return;
+    const rect = parent.getBoundingClientRect();
+    freqCanvas.width = rect.width * devicePixelRatio;
+    freqCanvas.height = 120 * devicePixelRatio;
+  }
+
+  function drawVisualizer() {
+    if (!analyserNode) return;
+    const c = freqCanvas.getContext('2d');
+    if (!c) return;
+    const parent = freqCanvas.parentElement;
+    if (!parent) return;
+    const rect = parent.getBoundingClientRect();
+    const w = rect.width, h = 120;
+    if (freqCanvas.width !== w * devicePixelRatio) {
+      freqCanvas.width = w * devicePixelRatio;
+      freqCanvas.height = h * devicePixelRatio;
+    }
+    c.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    const data = ctrl.player.getFrequencyDataByte(analyserNode);
+    const barWidth = w / data.length;
+    c.clearRect(0, 0, w, h);
+    for (let i = 0; i < data.length; i++) {
+      const value = data[i]! / 255;
+      const barHeight = value * h;
+      const hue = 240 + value * 60;
+      c.fillStyle = `hsla(${hue}, 70%, 60%, 0.8)`;
+      c.fillRect(i * barWidth, h - barHeight, barWidth - 1, barHeight);
+    }
+  }
+
+  const ctrl = createDemoController({
+    wrapperId: 'viz-demo',
+    prefix: 'viz-',
+    waveform: { showTime: false, seekable: false },
+    initNodes(player) {
+      const gainNode = player.createGain(0.8);
+      analyserNode = player.createAnalyser({ fftSize: 256 });
+      player.chain(gainNode, analyserNode, player.ctx.destination);
+      return gainNode;
+    },
+    onBufferLoaded() {
+      $('viz-freq-section').hidden = false;
+      resizeFreqCanvas();
+    },
+    getPlayOptions() {
+      return { loop: true };
+    },
+    onFrame() {
+      if (analyserNode) drawVisualizer();
+    },
+  });
+
+  resolutionInput.addEventListener('input', () => {
+    const res = Number(resolutionInput.value);
+    resolutionVal.textContent = `${res}`;
+    ctrl.updateWaveform(res);
+  });
+
+  window.addEventListener('resize', () => {
+    resizeFreqCanvas();
+  });
+</script>
+
+<style is:global>
+  @import '../../demo/style.css';
+
+  #viz-freq-canvas {
+    width: 100%;
+    height: 120px;
+    display: block;
+    background: var(--bg, #0f1117);
+    border-radius: 8px;
+  }
+</style>

@@ -1,0 +1,117 @@
+---
+import { t } from '../../i18n/translations';
+import type { Locale } from '../../i18n/translations';
+import SoundSourceCard from './SoundSourceCard.astro';
+import TransportButtons from './TransportButtons.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<div
+  class="demo-wrapper not-content"
+  data-i18n-pause={t(locale, 'playback.pause')}
+  data-i18n-play={t(locale, 'playback.play')}
+  data-i18n-loading={t(locale, 'source.loading')}
+  data-i18n-load-failed={t(locale, 'source.load-failed')}
+  data-i18n-load-file={t(locale, 'source.load-file')}
+>
+  <SoundSourceCard locale={locale} description={t(locale, 'source.description')} />
+
+  <!-- Waveform Section -->
+  <section class="card" id="waveform-section" hidden>
+    <h2>{t(locale, 'waveform.title')}</h2>
+    <div class="waveform-container">
+      <canvas id="waveform-canvas"></canvas>
+      <div id="waveform-cursor" class="waveform-cursor"></div>
+    </div>
+    <div id="time-display" class="time-display">
+      <span id="time-current">0:00.0</span>
+      <span id="time-duration">0:00.0</span>
+    </div>
+  </section>
+
+  <!-- Playback Controls -->
+  <section class="card" id="playback-section" hidden>
+    <h2>{t(locale, 'playback.title')}</h2>
+    <div class="playback-controls">
+      <TransportButtons locale={locale} />
+      <div class="control-params">
+        <label class="control-label">
+          {t(locale, 'playback.volume')}
+          <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8" />
+        </label>
+        <label class="control-label">
+          {t(locale, 'playback.pan')}
+          <input type="range" id="pan" min="-1" max="1" step="0.01" value="0" />
+        </label>
+        <label class="control-label">
+          {t(locale, 'playback.speed')}
+          <select id="speed">
+            <option value="0.5">0.5x</option>
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+        </label>
+        <label class="control-label control-label-checkbox">
+          <input type="checkbox" id="loop" />
+          {t(locale, 'playback.loop')}
+        </label>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  import { createDemoController } from '../../demo/demo-controller';
+  import { $ } from '../../demo/demo-utils';
+
+  let gainNode: GainNode | null = null;
+  let pannerNode: StereoPannerNode | null = null;
+
+  const volumeInput = $<HTMLInputElement>('volume');
+  const panInput = $<HTMLInputElement>('pan');
+  const speedSelect = $<HTMLSelectElement>('speed');
+  const loopCheckbox = $<HTMLInputElement>('loop');
+
+  const ctrl = createDemoController({
+    initNodes(player) {
+      gainNode = player.createGain(0.8);
+      pannerNode = player.createPanner(0);
+      player.chain(gainNode, pannerNode, player.ctx.destination);
+      return gainNode;
+    },
+    getPlayOptions() {
+      return {
+        loop: loopCheckbox.checked,
+        playbackRate: Number(speedSelect.value),
+      };
+    },
+  });
+
+  volumeInput.addEventListener('input', () => {
+    if (gainNode) gainNode.gain.value = Number(volumeInput.value);
+  });
+
+  panInput.addEventListener('input', () => {
+    if (pannerNode) pannerNode.pan.value = Number(panInput.value);
+  });
+
+  speedSelect.addEventListener('change', () => {
+    if (ctrl.currentPlayback) ctrl.currentPlayback.setPlaybackRate(Number(speedSelect.value));
+  });
+
+  loopCheckbox.addEventListener('change', () => {
+    if (ctrl.currentPlayback) ctrl.currentPlayback.setLoop(loopCheckbox.checked);
+  });
+</script>
+
+<style is:global>
+  @import '../../demo/style.css';
+</style>

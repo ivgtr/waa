@@ -177,6 +177,7 @@ export interface StretcherEvents {
   chunkready: { index: number };
   complete: void;
   ended: void;
+  loop: void;
   error: { message: string; chunkIndex?: number; fatal: boolean };
 }
 
@@ -188,6 +189,7 @@ export interface StretcherEngine {
   seek(position: number): void;
   stop(): void;
   setTempo(tempo: number): void;
+  setLoop(loop: boolean): void;
   getCurrentPosition(): number;
   getStatus(): StretcherStatus;
   getSnapshot(): StretcherSnapshotExtension;
