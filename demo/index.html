@@ -10,7 +10,7 @@
     <div class="container">
       <header>
         <h1>waa</h1>
-        <p class="subtitle">Composable Web Audio API utilities</p>
+        <p class="subtitle">Composable & batteries-included Web Audio API toolkit</p>
       </header>
 
       <main>
@@ -142,33 +142,32 @@
 
         <!-- API Examples -->
         <section class="card">
-          <h2>Code Example</h2>
-          <pre><code id="code-example">import {
-  createContext,
-  createSineBuffer,
-  play,
-  createGain,
-  createPanner,
-  createAnalyser,
-  extractPeaks,
-} from "waa";
+          <h2>Code Examples</h2>
+          <div class="code-tabs">
+            <div class="code-tab-buttons">
+              <button class="code-tab-btn active" data-tab="basic">Basic</button>
+              <button class="code-tab-btn" data-tab="byo-context">BYO Context</button>
+              <button class="code-tab-btn" data-tab="react">React</button>
+            </div>
+            <div class="code-tab-panel active" data-tab="basic">
+              <pre><code>import { WaaPlayer } from "waa-play";
 
-// Create AudioContext &amp; synthesize a tone
-const ctx = createContext();
-const buffer = createSineBuffer(ctx, 440, 2);
+// Create player (manages AudioContext internally)
+const player = new WaaPlayer();
+const buffer = player.createSineBuffer(440, 2);
 
-// Build audio graph: source -> gain -> panner -> destination
-const gain = createGain(ctx, 0.8);
-const panner = createPanner(ctx, 0);
+// Build audio graph
+const gain = player.createGain(0.8);
+const panner = player.createPanner(0);
 
 // Start playback
-const playback = play(ctx, buffer, {
+const playback = player.play(buffer, {
   through: [gain, panner],
   loop: true,
 });
 
 // Extract waveform data for visualization
-const peaks = extractPeaks(buffer, { resolution: 300 });
+const peaks = player.extractPeakPairs(buffer, { resolution: 300 });
 
 // Subscribe to time updates
 playback.on("timeupdate", ({ position, duration }) =&gt; {
@@ -180,7 +179,69 @@ playback.pause();
 playback.resume();
 playback.seek(1.0);
 playback.setPlaybackRate(1.5);
-playback.stop();</code></pre>
+playback.stop();
+
+// Cleanup
+player.dispose();</code></pre>
+            </div>
+            <div class="code-tab-panel" data-tab="byo-context">
+              <pre><code>import { WaaPlayer } from "waa-play";
+
+// Bring your own AudioContext
+const ctx = new AudioContext({ sampleRate: 48000 });
+const player = new WaaPlayer(ctx);
+
+// Load once, play many times
+const buffer = await player.load("/drums.mp3");
+
+const gain = player.createGain(0.8);
+const comp = player.createCompressor({ ratio: 4 });
+
+const a = player.play(buffer, { through: [gain, comp] });
+
+a.on("ended", () =&gt; {
+  // Reuse the same buffer
+  player.play(buffer, { through: [gain, comp] });
+});
+
+// player.dispose() won't close ctx (not owned)
+player.dispose();
+ctx.close();</code></pre>
+            </div>
+            <div class="code-tab-panel" data-tab="react">
+              <pre><code>import { useSyncExternalStore, useEffect, useRef } from "react";
+import { WaaPlayer, getSnapshot, subscribeSnapshot, onFrame } from "waa-play";
+import type { Playback, PlaybackSnapshot, PeakPair } from "waa-play";
+
+const player = new WaaPlayer();
+
+function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null {
+  return useSyncExternalStore(
+    (cb) =&gt; (playback ? subscribeSnapshot(playback, cb) : () =&gt; {}),
+    () =&gt; (playback ? getSnapshot(playback) : null),
+  );
+}
+
+function Player({ buffer }: { buffer: AudioBuffer }) {
+  const [playback, setPlayback] = useState&lt;Playback | null&gt;(null);
+  const snap = usePlaybackSnapshot(playback);
+  const peaks = useMemo(() =&gt; player.extractPeakPairs(buffer, { resolution: 200 }), [buffer]);
+
+  return (
+    &lt;div&gt;
+      &lt;Waveform peaks={peaks} progress={snap?.progress ?? 0} /&gt;
+      &lt;button onClick={() =&gt; {
+        if (!playback) setPlayback(player.play(buffer));
+        else playback.togglePlayPause();
+      }}&gt;
+        {snap?.state === "playing" ? "Pause" : "Play"}
+      &lt;/button&gt;
+      &lt;span&gt;{snap?.position.toFixed(1)}s / {snap?.duration.toFixed(1)}s&lt;/span&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+            </div>
+          </div>
         </section>
       </main>
 

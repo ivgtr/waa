@@ -1,18 +1,4 @@
-import {
-  createContext,
-  ensureRunning,
-  loadBufferFromBlob,
-  play,
-  createGain,
-  createPanner,
-  createAnalyser,
-  getFrequencyDataByte,
-  createSineBuffer,
-  createNoiseBuffer,
-  createClickBuffer,
-  extractPeakPairs,
-  onFrame,
-} from "waa";
+import { WaaPlayer } from "waa";
 import type { Playback, PeakPair, StretcherSnapshotExtension } from "waa";
 
 // ---------------------------------------------------------------------------
@@ -66,7 +52,7 @@ const visualizerCanvas = $<HTMLCanvasElement>("visualizer-canvas");
 // Audio State
 // ---------------------------------------------------------------------------
 
-let ctx: AudioContext | null = null;
+const player = new WaaPlayer();
 let gainNode: GainNode | null = null;
 let pannerNode: StereoPannerNode | null = null;
 let analyserNode: AnalyserNode | null = null;
@@ -75,18 +61,13 @@ let currentPlayback: Playback | null = null;
 let stopFrameLoop: (() => void) | null = null;
 let peaks: PeakPair[] = [];
 
-function getCtx(): AudioContext {
-  if (!ctx) {
-    ctx = createContext();
-    gainNode = createGain(ctx, 0.8);
-    pannerNode = createPanner(ctx, 0);
-    analyserNode = createAnalyser(ctx, { fftSize: 256 });
-    // chain: gain -> panner -> analyser -> destination
-    gainNode.connect(pannerNode);
-    pannerNode.connect(analyserNode);
-    analyserNode.connect(ctx.destination);
+function initNodes() {
+  if (!gainNode) {
+    gainNode = player.createGain(0.8);
+    pannerNode = player.createPanner(0);
+    analyserNode = player.createAnalyser({ fftSize: 256 });
+    player.chain(gainNode, pannerNode!, analyserNode!, player.ctx.destination);
   }
-  return ctx;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,8 +109,8 @@ synthDur.addEventListener("input", () => {
 // ---------------------------------------------------------------------------
 
 btnGenerate.addEventListener("click", async () => {
-  const audioCtx = getCtx();
-  await ensureRunning(audioCtx);
+  await player.ensureRunning();
+  initNodes();
 
   const freq = Number(synthFreq.value);
   const dur = Number(synthDur.value);
@@ -138,13 +119,13 @@ btnGenerate.addEventListener("click", async () => {
   let buffer: AudioBuffer;
   switch (type) {
     case "noise":
-      buffer = createNoiseBuffer(audioCtx, dur);
+      buffer = player.createNoiseBuffer(dur);
       break;
     case "click":
-      buffer = createClickBuffer(audioCtx, freq, dur);
+      buffer = player.createClickBuffer(freq, dur);
       break;
     default:
-      buffer = createSineBuffer(audioCtx, freq, dur);
+      buffer = player.createSineBuffer(freq, dur);
   }
 
   loadAudio(buffer);
@@ -164,10 +145,10 @@ fileInput.addEventListener("change", async () => {
   fileName.innerHTML = '<span class="spinner"></span>';
 
   try {
-    const audioCtx = getCtx();
-    await ensureRunning(audioCtx);
+    await player.ensureRunning();
+    initNodes();
 
-    const buffer = await loadBufferFromBlob(audioCtx, file);
+    const buffer = await player.loadFromBlob(file);
 
     // Restore label and show file name
     fileName.textContent = file.name;
@@ -198,7 +179,7 @@ function loadAudio(buffer: AudioBuffer) {
   currentBuffer = buffer;
 
   // Extract waveform peaks
-  peaks = extractPeakPairs(buffer, { resolution: 300 });
+  peaks = player.extractPeakPairs(buffer, { resolution: 300 });
 
   // Show sections first so the canvas has layout dimensions for drawing
   waveformSection.hidden = false;
@@ -265,8 +246,8 @@ waveformCanvas.parentElement!.addEventListener("click", (e) => {
 // ---------------------------------------------------------------------------
 
 btnPlayPause.addEventListener("click", async () => {
-  const audioCtx = getCtx();
-  await ensureRunning(audioCtx);
+  await player.ensureRunning();
+  initNodes();
 
   if (!currentBuffer) return;
 
@@ -294,7 +275,7 @@ btnPlayPause.addEventListener("click", async () => {
 
   const usePitchPreserve = preservePitchCheckbox.checked;
 
-  currentPlayback = play(audioCtx, currentBuffer, {
+  currentPlayback = player.play(currentBuffer, {
     through: [gainNode!],
     loop: usePitchPreserve ? false : loopCheckbox.checked,
     playbackRate: Number(speedSelect.value),
@@ -305,7 +286,7 @@ btnPlayPause.addEventListener("click", async () => {
   updateStretcherVisibility();
 
   // Frame loop for visualizer + cursor updates
-  stopFrameLoop = onFrame(currentPlayback, (snapshot) => {
+  stopFrameLoop = player.onFrame(currentPlayback, (snapshot) => {
     // Update cursor
     waveformCursor.style.left = `${snapshot.progress * 100}%`;
     timeCurrent.textContent = formatTime(snapshot.position);
@@ -410,7 +391,7 @@ function drawVisualizer() {
   }
   c.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
 
-  const data = getFrequencyDataByte(analyserNode);
+  const data = player.getFrequencyDataByte(analyserNode);
   const barCount = data.length;
   const barWidth = w / barCount;
 
@@ -529,3 +510,17 @@ function formatTime(seconds: number): string {
   const secs = seconds % 60;
   return `${mins}:${secs < 10 ? "0" : ""}${secs.toFixed(1)}`;
 }
+
+// ---------------------------------------------------------------------------
+// Code Example Tabs
+// ---------------------------------------------------------------------------
+
+document.querySelector(".code-tab-buttons")?.addEventListener("click", (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".code-tab-btn");
+  if (!btn) return;
+  const tab = btn.dataset.tab!;
+  document.querySelectorAll(".code-tab-btn").forEach((b) => b.classList.remove("active"));
+  document.querySelectorAll(".code-tab-panel").forEach((p) => p.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelector(`.code-tab-panel[data-tab="${tab}"]`)?.classList.add("active");
+});

@@ -573,6 +573,47 @@ code {
   color: var(--text-muted);
 }
 
+/* ── Code Tabs ──────────────────────────────────────────────── */
+
+.code-tab-buttons {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.code-tab-btn {
+  background: none;
+  border: none;
+  padding: 0.5rem 1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: 0.8rem;
+}
+
+.code-tab-btn:hover {
+  color: var(--text);
+}
+
+.code-tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.code-tab-panel {
+  display: none;
+}
+
+.code-tab-panel.active {
+  display: block;
+}
+
+.code-tab-panel pre {
+  border-radius: 0 0 var(--radius) var(--radius);
+  margin: 0;
+}
+
 /* ── Footer ──────────────────────────────────────────────────── */
 
 footer {
