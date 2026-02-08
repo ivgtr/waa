@@ -11,6 +11,7 @@ export interface UseReactPlayerReturn {
   snap: PlaybackSnapshot | null;
   peaks: PeakPair[];
   state: 'playing' | 'paused' | 'stopped';
+  loop: boolean;
   synthType: string;
   setSynthType: (v: string) => void;
   synthFreq: number;
@@ -25,6 +26,7 @@ export interface UseReactPlayerReturn {
   handleToggle: () => void;
   handleStop: () => void;
   handleSeek: (ratio: number) => void;
+  handleLoopToggle: () => void;
 }
 
 export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
@@ -36,6 +38,7 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
 
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [playback, setPlayback] = useState<Playback | null>(null);
+  const [loop, setLoop] = useState(true);
   const [synthType, setSynthType] = useState('sine');
   const [synthFreq, setSynthFreq] = useState(440);
   const [synthDur, setSynthDur] = useState(3);
@@ -94,7 +97,7 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
       if (playback) {
         playback.dispose();
       }
-      const pb = p.play(buffer, { loop: true });
+      const pb = p.play(buffer, { loop });
       setPlayback(pb);
     } else {
       playback.togglePlayPause();
@@ -113,6 +116,12 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
     }
   }
 
+  function handleLoopToggle() {
+    const next = !loop;
+    setLoop(next);
+    if (playback) playback.setLoop(next);
+  }
+
   const state = snap?.state ?? 'stopped';
 
   return {
@@ -121,6 +130,7 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
     snap,
     peaks,
     state,
+    loop,
     synthType,
     setSynthType,
     synthFreq,
@@ -135,5 +145,6 @@ export function useReactPlayer(locale: Locale): UseReactPlayerReturn {
     handleToggle,
     handleStop,
     handleSeek,
+    handleLoopToggle,
   };
 }

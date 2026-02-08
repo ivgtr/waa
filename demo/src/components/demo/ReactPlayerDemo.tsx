@@ -54,6 +54,7 @@ export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
     snap,
     peaks,
     state,
+    loop,
     synthType,
     setSynthType,
     synthFreq,
@@ -68,6 +69,7 @@ export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
     handleToggle,
     handleStop,
     handleSeek,
+    handleLoopToggle,
   } = useReactPlayer(locale);
 
   return (
@@ -157,6 +159,10 @@ export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
                   </svg>
                 </button>
               </div>
+              <label className="control-label control-label-checkbox">
+                <input type="checkbox" checked={loop} onChange={handleLoopToggle} />
+                {t(locale, 'playback.loop')}
+              </label>
             </div>
           </section>
         </>

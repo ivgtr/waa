@@ -20,6 +20,7 @@ function useReactPlayer() {
   const waaRef = useRef(new WaaPlayer());
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [playback, setPlayback] = useState<Playback | null>(null);
+  const [loop, setLoop] = useState(true);
   const snap = usePlaybackSnapshot(playback);
   const peaks = useMemo(
     () => (buffer ? waaRef.current.extractPeakPairs(buffer, { resolution: 200 }) : []),
@@ -47,7 +48,7 @@ function useReactPlayer() {
     if (!buffer) return;
     if (!playback || playback.getState() === "stopped") {
       if (playback) playback.dispose();
-      setPlayback(waaRef.current.play(buffer, { loop: true }));
+      setPlayback(waaRef.current.play(buffer, { loop }));
     } else {
       playback.togglePlayPause();
     }
@@ -63,13 +64,19 @@ function useReactPlayer() {
     }
   }
 
-  return { buffer, snap, peaks, handleGenerate, handleFile, handleToggle, handleStop, handleSeek };
+  function handleLoopToggle() {
+    const next = !loop;
+    setLoop(next);
+    if (playback) playback.setLoop(next);
+  }
+
+  return { buffer, snap, peaks, loop, handleGenerate, handleFile, handleToggle, handleStop, handleSeek, handleLoopToggle };
 }
 
 // --- component ---
 
 export default function ReactPlayerDemo() {
-  const { buffer, snap, peaks, handleGenerate, handleFile, handleToggle, handleStop, handleSeek } =
+  const { buffer, snap, peaks, loop, handleGenerate, handleFile, handleToggle, handleStop, handleSeek, handleLoopToggle } =
     useReactPlayer();
   const state = snap?.state ?? "stopped";
 
@@ -87,6 +94,10 @@ export default function ReactPlayerDemo() {
           <button onClick={handleStop} disabled={state === "stopped"}>
             Stop
           </button>
+          <label>
+            <input type="checkbox" checked={loop} onChange={handleLoopToggle} />
+            Loop
+          </label>
         </>
       )}
     </div>
