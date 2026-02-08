@@ -4,11 +4,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 
-Composable & batteries-included Web Audio API toolkit.
+Convenient composable building blocks for Web Audio API.
 
-BYO AudioContext / Zero Dependencies / Framework-agnostic / Sample-accurate / Pitch-preserving time-stretch / Chunk-based streaming
+Time-stretch / Streaming / Waveform / BYO AudioContext / Zero Dependencies
 
-**[Documentation & Demo](https://ivgtr.github.io/waa/)**
+[Documentation & Demo](https://ivgtr.github.io/waa/)
 
 ## Install
 
@@ -16,29 +16,31 @@ BYO AudioContext / Zero Dependencies / Framework-agnostic / Sample-accurate / Pi
 npm install waa-play
 ```
 
+## Features
+
+### Pitch-preserving time-stretch
+再生速度を変えてもピッチが変わりません。処理は別スレッドで実行されるため、UI をブロックしません。
+
+### Streaming playback
+音声を段階的に処理し、バッファリング状態をイベントで通知します。ローディング UI を簡単に実装できます。
+
+### BYO AudioContext
+既存の AudioContext やオーディオグラフをそのまま使えます。他のライブラリとの統合も容易です。
+
+### Framework integration
+React・Vue・Svelte など、お好みのフレームワークで再生状態をリアクティブに扱えます。
+
+### Waveform extraction
+波形データを取得し、プログレスバーや波形ビジュアライザーを構築できます。
+
+### Background-tab safe
+バックグラウンドタブでも再生位置の追跡が継続します。
+
 ## Quick Start
 
-### Function API
+### Class API (WaaPlayer)
 
-関数単位で必要なものだけ import して使う設計です。全関数が `AudioContext` を第一引数に取ります。
-
-```ts
-import { createContext, loadBuffer, play, createGain } from "waa-play";
-
-const ctx = createContext();
-const buffer = await loadBuffer(ctx, "/audio/track.mp3");
-
-const gain = createGain(ctx, 0.8);
-const playback = play(ctx, buffer, { through: [gain] });
-
-playback.on("timeupdate", ({ position, duration }) => {
-  console.log(`${position.toFixed(1)}s / ${duration.toFixed(1)}s`);
-});
-```
-
-### Class API
-
-`WaaPlayer` は全モジュールの機能を統合し、`AudioContext` を内部管理するクラスです。
+最もシンプルな使い方です。`WaaPlayer` が `AudioContext` を内部管理し、全モジュールの機能を統合して提供します。
 
 ```ts
 import { WaaPlayer } from "waa-play";
@@ -58,6 +60,24 @@ player.dispose();
 const player = new WaaPlayer(existingAudioContext);
 ```
 
+### Function API
+
+個別の関数だけ import したい場合はこちら。全関数が `AudioContext` を第一引数に取ります。
+
+```ts
+import { createContext, loadBuffer, play, createGain } from "waa-play";
+
+const ctx = createContext();
+const buffer = await loadBuffer(ctx, "/audio/track.mp3");
+
+const gain = createGain(ctx, 0.8);
+const playback = play(ctx, buffer, { through: [gain] });
+
+playback.on("timeupdate", ({ position, duration }) => {
+  console.log(`${position.toFixed(1)}s / ${duration.toFixed(1)}s`);
+});
+```
+
 ## Modules
 
 必要なものだけ個別に import できます。
@@ -70,6 +90,7 @@ import { WaaPlayer } from "waa-play/player";
 
 | Module | 概要 |
 |--------|------|
+| `player` | 全モジュールを統合するクラスベース API |
 | `context` | AudioContext のライフサイクル管理 |
 | `buffer` | 音声ファイルのロード・デコード |
 | `play` | 再生制御（play / pause / seek / loop / preservePitch） |
@@ -81,11 +102,10 @@ import { WaaPlayer } from "waa-play/player";
 | `synth` | 波形バッファの生成（sin / noise / click） |
 | `adapters` | フレームワーク統合（React / Vue / Svelte） |
 | `stretcher` | ピッチ保持タイムストレッチ（WSOLA） |
-| `player` | 全モジュールを統合するクラスベース API |
 
 ## API
 
-詳細な使い方・API リファレンスは **[Documentation & Demo](https://ivgtr.github.io/waa/)** をご覧ください。
+詳細な使い方・API リファレンスは [Documentation & Demo](https://ivgtr.github.io/waa/) をご覧ください。
 
 ### WaaPlayer
 
