@@ -1,0 +1,61 @@
+---
+import { t } from '../../i18n/translations';
+import type { Locale } from '../../i18n/translations';
+
+interface Props {
+  locale: Locale;
+  prefix?: string;
+  description?: string;
+  durMin?: number;
+  durMax?: number;
+  durDefault?: number;
+}
+
+const {
+  locale,
+  prefix = '',
+  description,
+  durMin = 0.5,
+  durMax = 5,
+  durDefault = 2,
+} = Astro.props;
+---
+
+<section class="card">
+  <h2>{t(locale, 'source.title')}</h2>
+  {description && <p class="description">{description}</p>}
+  <div class="source-controls">
+    <div class="synth-controls">
+      <div class="synth-params">
+        <label class="synth-label">
+          <span class="label-text">{t(locale, 'source.type')}</span>
+          <select id={`${prefix}synth-type`}>
+            <option value="sine">{t(locale, 'source.sine')}</option>
+            <option value="noise">{t(locale, 'source.noise')}</option>
+            <option value="click">{t(locale, 'source.click')}</option>
+          </select>
+        </label>
+        <label class="synth-label">
+          <span class="label-text">{t(locale, 'source.frequency')}</span>
+          <input type="range" id={`${prefix}synth-freq`} min="50" max="2000" value="440" />
+          <span id={`${prefix}synth-freq-val`} class="range-value">440 Hz</span>
+        </label>
+        <label class="synth-label">
+          <span class="label-text">{t(locale, 'source.duration')}</span>
+          <input type="range" id={`${prefix}synth-dur`} min={durMin} max={durMax} step="0.5" value={durDefault} />
+          <span id={`${prefix}synth-dur-val`} class="range-value">{durDefault.toFixed(1)} s</span>
+        </label>
+      </div>
+      <button id={`${prefix}btn-generate`} class="btn btn-primary">{t(locale, 'source.generate')}</button>
+    </div>
+    <div class="divider">{t(locale, 'source.or')}</div>
+    <div class="file-controls">
+      <label class="btn btn-secondary file-label" id={`${prefix}file-label`}>
+        <svg class="file-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span id={`${prefix}file-label-text`}>{t(locale, 'source.load-file')}</span>
+        <input type="file" id={`${prefix}file-input`} accept="audio/*" hidden />
+      </label>
+      <span id={`${prefix}file-name`} class="file-name"></span>
+    </div>
+  </div>
+</section>

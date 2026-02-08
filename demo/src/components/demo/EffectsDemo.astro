@@ -1,6 +1,8 @@
 ---
 import { t } from '../../i18n/translations';
 import type { Locale } from '../../i18n/translations';
+import SoundSourceCard from './SoundSourceCard.astro';
+import TransportButtons from './TransportButtons.astro';
 
 interface Props {
   locale: Locale;
@@ -18,44 +20,7 @@ const { locale } = Astro.props;
   data-i18n-load-failed={t(locale, 'source.load-failed')}
   data-i18n-load-file={t(locale, 'source.load-file')}
 >
-  <!-- Sound Source -->
-  <section class="card">
-    <h2>{t(locale, 'source.title')}</h2>
-    <div class="source-controls">
-      <div class="synth-controls">
-        <div class="synth-params">
-          <label class="synth-label">
-            <span class="label-text">{t(locale, 'source.type')}</span>
-            <select id="fx-synth-type">
-              <option value="sine">{t(locale, 'source.sine')}</option>
-              <option value="noise">{t(locale, 'source.noise')}</option>
-              <option value="click">{t(locale, 'source.click')}</option>
-            </select>
-          </label>
-          <label class="synth-label">
-            <span class="label-text">{t(locale, 'source.frequency')}</span>
-            <input type="range" id="fx-synth-freq" min="50" max="2000" value="440" />
-            <span id="fx-synth-freq-val" class="range-value">440 Hz</span>
-          </label>
-          <label class="synth-label">
-            <span class="label-text">{t(locale, 'source.duration')}</span>
-            <input type="range" id="fx-synth-dur" min="1" max="5" step="0.5" value="3" />
-            <span id="fx-synth-dur-val" class="range-value">3.0 s</span>
-          </label>
-        </div>
-        <button id="fx-btn-generate" class="btn btn-primary">{t(locale, 'source.generate')}</button>
-      </div>
-      <div class="divider">{t(locale, 'source.or')}</div>
-      <div class="file-controls">
-        <label class="btn btn-secondary file-label" id="fx-file-label">
-          <svg class="file-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span id="fx-file-label-text">{t(locale, 'source.load-file')}</span>
-          <input type="file" id="fx-file-input" accept="audio/*" hidden />
-        </label>
-        <span id="fx-file-name" class="file-name"></span>
-      </div>
-    </div>
-  </section>
+  <SoundSourceCard locale={locale} prefix="fx-" durMin={1} durDefault={3} />
 
   <!-- Effects Chain -->
   <section class="card" id="fx-controls-section" hidden>
@@ -69,9 +34,9 @@ const { locale } = Astro.props;
       <label class="control-label">
         {t(locale, 'demo.effects.filter-type')}
         <select id="fx-filter-type">
-          <option value="lowpass">Lowpass</option>
-          <option value="highpass">Highpass</option>
-          <option value="bandpass">Bandpass</option>
+          <option value="lowpass">{t(locale, 'demo.effects.filter-lowpass')}</option>
+          <option value="highpass">{t(locale, 'demo.effects.filter-highpass')}</option>
+          <option value="bandpass">{t(locale, 'demo.effects.filter-bandpass')}</option>
         </select>
       </label>
       <label class="control-label">
@@ -86,14 +51,8 @@ const { locale } = Astro.props;
       </label>
     </div>
 
-    <div class="transport-buttons" style="margin-top: 1rem;">
-      <button id="fx-btn-play" class="btn btn-icon btn-transport" data-state="stopped">
-        <svg class="icon-play" viewBox="0 0 24 24" width="20" height="20"><polygon points="6,3 20,12 6,21" fill="currentColor"/></svg>
-        <svg class="icon-pause" viewBox="0 0 24 24" width="20" height="20" hidden><rect x="5" y="3" width="4" height="18" fill="currentColor"/><rect x="15" y="3" width="4" height="18" fill="currentColor"/></svg>
-      </button>
-      <button id="fx-btn-stop" class="btn btn-icon btn-transport" disabled>
-        <svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor"/></svg>
-      </button>
+    <div style="margin-top: 1rem;">
+      <TransportButtons locale={locale} prefix="fx-" />
     </div>
   </section>
 
@@ -107,33 +66,19 @@ const { locale } = Astro.props;
         <span id="fx-fade-dur-val" class="range-value">0.5 s</span>
       </label>
       <div style="display: flex; gap: 0.5rem;">
-        <button id="fx-btn-fade-in" class="btn">Fade In</button>
-        <button id="fx-btn-fade-out" class="btn">Fade Out</button>
+        <button id="fx-btn-fade-in" class="btn">{t(locale, 'demo.effects.fade-in')}</button>
+        <button id="fx-btn-fade-out" class="btn">{t(locale, 'demo.effects.fade-out')}</button>
       </div>
     </div>
   </section>
 </div>
 
 <script>
-  import { getSharedPlayer } from '../../demo/shared-player';
-  import { initI18nStrings, setTransportState, setupFileInputHandler, generateSynthBuffer } from '../../demo/demo-utils';
-  import type { TransportElements } from '../../demo/demo-utils';
-  import type { Playback } from 'waa';
+  import { createDemoController } from '../../demo/demo-controller';
+  import { $ } from '../../demo/demo-utils';
 
-  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-
-  const wrapper = document.getElementById('effects-demo') as HTMLElement;
-  const i18n = initI18nStrings(wrapper);
-
-  const synthType = $<HTMLSelectElement>('fx-synth-type');
-  const synthFreq = $<HTMLInputElement>('fx-synth-freq');
-  const synthFreqVal = $('fx-synth-freq-val');
-  const synthDur = $<HTMLInputElement>('fx-synth-dur');
-  const synthDurVal = $('fx-synth-dur-val');
-  const btnGenerate = $<HTMLButtonElement>('fx-btn-generate');
-
-  const controlsSection = $('fx-controls-section');
-  const fadeSection = $('fx-fade-section');
+  let gainNode: GainNode | null = null;
+  let filterNode: BiquadFilterNode | null = null;
 
   const gainInput = $<HTMLInputElement>('fx-gain');
   const gainVal = $('fx-gain-val');
@@ -142,52 +87,31 @@ const { locale } = Astro.props;
   const filterFreqVal = $('fx-filter-freq-val');
   const filterQ = $<HTMLInputElement>('fx-filter-q');
   const filterQVal = $('fx-filter-q-val');
-
-  const btnPlay = $<HTMLButtonElement>('fx-btn-play');
-  const btnStop = $<HTMLButtonElement>('fx-btn-stop');
-  const transport: TransportElements = {
-    btnPlayPause: btnPlay,
-    btnStop,
-    iconPlay: btnPlay.querySelector('.icon-play') as SVGElement,
-    iconPause: btnPlay.querySelector('.icon-pause') as SVGElement,
-  };
-
   const fadeDur = $<HTMLInputElement>('fx-fade-dur');
   const fadeDurVal = $('fx-fade-dur-val');
   const btnFadeIn = $<HTMLButtonElement>('fx-btn-fade-in');
   const btnFadeOut = $<HTMLButtonElement>('fx-btn-fade-out');
 
-  const player = getSharedPlayer();
-  let gainNode: GainNode | null = null;
-  let filterNode: BiquadFilterNode | null = null;
-  let currentBuffer: AudioBuffer | null = null;
-  let currentPlayback: Playback | null = null;
-
-  function initNodes() {
-    if (!gainNode) {
+  const ctrl = createDemoController({
+    wrapperId: 'effects-demo',
+    prefix: 'fx-',
+    waveform: false,
+    initNodes(player) {
       gainNode = player.createGain(Number(gainInput.value));
       filterNode = player.ctx.createBiquadFilter();
       filterNode.type = filterType.value as BiquadFilterType;
       filterNode.frequency.value = Number(filterFreq.value);
       filterNode.Q.value = Number(filterQ.value);
       player.chain(gainNode, filterNode, player.ctx.destination);
-    }
-  }
-
-  function loadAudio(buffer: AudioBuffer) {
-    if (currentPlayback) { currentPlayback.dispose(); currentPlayback = null; }
-    currentBuffer = buffer;
-    controlsSection.hidden = false;
-    fadeSection.hidden = false;
-    setTransportState('stopped', transport, i18n);
-  }
-
-  synthFreq.addEventListener('input', () => {
-    synthFreqVal.textContent = `${synthFreq.value} Hz`;
-  });
-
-  synthDur.addEventListener('input', () => {
-    synthDurVal.textContent = `${Number(synthDur.value).toFixed(1)} s`;
+      return gainNode;
+    },
+    onBufferLoaded() {
+      $('fx-controls-section').hidden = false;
+      $('fx-fade-section').hidden = false;
+    },
+    getPlayOptions() {
+      return { loop: true };
+    },
   });
 
   gainInput.addEventListener('input', () => {
@@ -216,65 +140,14 @@ const { locale } = Astro.props;
     fadeDurVal.textContent = `${Number(fadeDur.value).toFixed(1)} s`;
   });
 
-  btnGenerate.addEventListener('click', async () => {
-    await player.ensureRunning();
-    initNodes();
-    const buffer = generateSynthBuffer(player, synthType.value, Number(synthFreq.value), Number(synthDur.value));
-    loadAudio(buffer);
-  });
-
-  setupFileInputHandler(
-    player, i18n,
-    {
-      fileInput: $<HTMLInputElement>('fx-file-input'),
-      fileLabel: $('fx-file-label'),
-      fileLabelText: $('fx-file-label-text'),
-      fileName: $('fx-file-name'),
-    },
-    initNodes,
-    loadAudio,
-  );
-
-  btnPlay.addEventListener('click', async () => {
-    await player.ensureRunning();
-    initNodes();
-    if (!currentBuffer) return;
-    if (currentPlayback && currentPlayback.getState() === 'playing') {
-      currentPlayback.pause();
-      setTransportState('paused', transport, i18n);
-      return;
-    }
-    if (currentPlayback && currentPlayback.getState() === 'paused') {
-      currentPlayback.resume();
-      setTransportState('playing', transport, i18n);
-      return;
-    }
-    if (currentPlayback) currentPlayback.dispose();
-    currentPlayback = player.play(currentBuffer, {
-      through: [gainNode!],
-      loop: true,
-    });
-    setTransportState('playing', transport, i18n);
-    currentPlayback.on('ended', () => setTransportState('stopped', transport, i18n));
-  });
-
-  btnStop.addEventListener('click', () => {
-    if (currentPlayback) {
-      currentPlayback.stop();
-      setTransportState('stopped', transport, i18n);
-    }
-  });
-
   btnFadeIn.addEventListener('click', () => {
     if (!gainNode) return;
-    const dur = Number(fadeDur.value);
-    player.fadeIn(gainNode, dur);
+    ctrl.player.fadeIn(gainNode, Number(fadeDur.value));
   });
 
   btnFadeOut.addEventListener('click', () => {
     if (!gainNode) return;
-    const dur = Number(fadeDur.value);
-    player.fadeOut(gainNode, dur);
+    ctrl.player.fadeOut(gainNode, Number(fadeDur.value));
   });
 </script>
 

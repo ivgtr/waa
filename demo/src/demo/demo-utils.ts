@@ -25,6 +25,12 @@ export function initI18nStrings(wrapper: HTMLElement | null): I18nStrings {
   };
 }
 
+/* ── DOM helper ─────────────────────────────────────────────── */
+
+export function $<T extends HTMLElement>(id: string): T {
+  return document.getElementById(id) as T;
+}
+
 /* ── Waveform ───────────────────────────────────────────────── */
 
 export function drawWaveform(
@@ -32,7 +38,9 @@ export function drawWaveform(
   pairs: PeakPair[],
   fillStyle = 'rgba(99, 102, 241, 0.6)',
 ): void {
-  const rect = canvas.parentElement!.getBoundingClientRect();
+  const parent = canvas.parentElement;
+  if (!parent) return;
+  const rect = parent.getBoundingClientRect();
   canvas.width = rect.width * devicePixelRatio;
   canvas.height = rect.height * devicePixelRatio;
   const c = canvas.getContext('2d')!;
@@ -90,7 +98,9 @@ export function setupFileInputHandler(
   el: FileInputElements,
   initNodes: () => void,
   onLoad: (buffer: AudioBuffer) => void,
+  signal?: AbortSignal,
 ): void {
+  const opts = signal ? { signal } : undefined;
   el.fileInput.addEventListener('change', async () => {
     const file = el.fileInput.files?.[0];
     if (!file) return;
@@ -109,7 +119,7 @@ export function setupFileInputHandler(
       el.fileLabel.classList.remove('is-loading');
       el.fileLabelText.textContent = i18n.loadFile;
     }
-  });
+  }, opts);
 }
 
 /* ── Synth Generation ───────────────────────────────────────── */
