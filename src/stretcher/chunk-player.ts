@@ -234,9 +234,9 @@ export function createChunkPlayer(
   }
 
   function resume(): void {
-    // Resume needs a new buffer — the engine will call playChunk again
+    // Resume needs a new buffer — the engine will call playChunk again.
+    // paused フラグは playChunk() が解除する。
     if (!paused || disposed) return;
-    paused = false;
   }
 
   function stop(): void {

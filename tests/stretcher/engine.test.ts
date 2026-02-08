@@ -303,6 +303,49 @@ describe("createStretcherEngine", () => {
     engine.dispose();
   });
 
+  it("pause/resume で位置がスキップしない", () => {
+    const ctx = createMockAudioContext();
+    const buffer = createMockAudioBuffer(60);
+
+    const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
+    engine.start();
+
+    // buffering 中に pause
+    engine.pause();
+    expect(engine.getStatus().phase).toBe("paused");
+
+    const posAtPause = engine.getCurrentPosition();
+
+    // resume
+    engine.resume();
+
+    // resume 後の位置が pause 時と同じであること
+    expect(engine.getCurrentPosition()).toBe(posAtPause);
+
+    engine.dispose();
+  });
+
+  it("複数回 pause/resume で位置ドリフトが蓄積しない", () => {
+    const ctx = createMockAudioContext();
+    const buffer = createMockAudioBuffer(60);
+
+    const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
+    engine.start();
+
+    const posInitial = engine.getCurrentPosition();
+
+    // 複数回 pause/resume
+    for (let i = 0; i < 5; i++) {
+      engine.pause();
+      engine.resume();
+    }
+
+    // 位置が初期値と変わらない（chunk が ready でないため buffering に入る）
+    expect(engine.getCurrentPosition()).toBe(posInitial);
+
+    engine.dispose();
+  });
+
   it("event subscription and unsubscription works", () => {
     const ctx = createMockAudioContext();
     const buffer = createMockAudioBuffer(60);

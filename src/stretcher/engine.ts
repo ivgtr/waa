@@ -544,10 +544,10 @@ export function createStretcherEngine(
 
     const chunk = chunks[currentChunkIndex];
     if (chunk && chunk.state === "ready") {
+      const resumePosition = chunkPlayer.getCurrentPosition();
       phase = "playing";
       chunkPlayer.resume();
-      // Re-start from paused position
-      playCurrentChunk(chunkPlayer.getCurrentPosition());
+      playCurrentChunk(resumePosition);
     } else {
       enterBuffering("underrun");
     }
