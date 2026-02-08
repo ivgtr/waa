@@ -1,0 +1,39 @@
+---
+title: waa-play
+description: Composable & batteries-included Web Audio API toolkit
+template: splash
+hero:
+  title: waa-play
+  tagline: Composable & batteries-included Web Audio API toolkit
+  actions:
+    - text: Getting Started
+      link: /waa/guide/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Live Demo
+      link: /waa/demo/
+      variant: minimal
+    - text: GitHub
+      link: https://github.com/ivgtr/waa
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+<CardGrid>
+  <Card title="Pitch-preserving Time-stretch" icon="rocket">
+    WSOLA-based streaming playback with real-time tempo change. Processing runs in a separate thread.
+  </Card>
+  <Card title="BYO AudioContext" icon="setting">
+    Every function takes an AudioContext as its first argument. No hidden global state.
+  </Card>
+  <Card title="Tree-shakeable" icon="seti:json">
+    11 independent modules with separate entry points. Import only what you need.
+  </Card>
+  <Card title="Framework Adapters" icon="puzzle">
+    Built-in snapshot-based integration for React, Vue, Svelte, and any framework.
+  </Card>
+</CardGrid>

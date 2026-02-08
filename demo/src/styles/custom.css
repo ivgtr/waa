@@ -1,0 +1,8 @@
+:root[data-theme='dark'] {
+  --sl-color-accent-high: #818cf8;
+  --sl-color-accent: #6366f1;
+  --sl-color-accent-low: rgba(99, 102, 241, 0.15);
+  --sl-color-bg-nav: #0f1117;
+  --sl-color-bg-sidebar: #0f1117;
+  --sl-color-bg: #0f1117;
+}
