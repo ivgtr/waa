@@ -36,6 +36,16 @@ export default defineConfig({
             { label: 'Stretcher', slug: 'api/stretcher' },
           ],
         },
+        {
+          label: 'ユースケース',
+          translations: { en: 'Use Cases', 'zh-CN': '使用场景' },
+          items: [
+            { label: 'エフェクトとフェード', translations: { en: 'Effects & Fade', 'zh-CN': '效果与淡化' }, slug: 'use-cases/effects-and-fade' },
+            { label: 'ビジュアライゼーション', translations: { en: 'Visualization', 'zh-CN': '可视化' }, slug: 'use-cases/visualization' },
+            { label: 'テンポ変更とリズム', translations: { en: 'Tempo & Rhythm', 'zh-CN': '节奏与韵律' }, slug: 'use-cases/tempo-and-rhythm' },
+            { label: 'フレームワーク統合', translations: { en: 'Framework Integration', 'zh-CN': '框架集成' }, slug: 'use-cases/framework-integration' },
+          ],
+        },
         { label: 'デモ', translations: { en: 'Demo', 'zh-CN': '演示' }, link: '/demo' },
       ],
     }),
