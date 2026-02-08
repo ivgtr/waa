@@ -390,13 +390,18 @@ whenPosition(playback: Playback, position: number): Promise<void>;
 ### React の例
 
 ```tsx
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, useCallback } from "react";
 import { getSnapshot, subscribeSnapshot } from "waa-play/adapters";
 
 function usePlayback(playback: Playback) {
-  return useSyncExternalStore(
-    (cb) => subscribeSnapshot(playback, cb),
-    () => getSnapshot(playback),
+  const subscribe = useCallback(
+    (cb: () => void) => subscribeSnapshot(playback, cb),
+    [playback],
   );
+  const snap = useCallback(
+    () => getSnapshot(playback),
+    [playback],
+  );
+  return useSyncExternalStore(subscribe, snap, snap);
 }
 ```

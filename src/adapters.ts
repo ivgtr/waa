@@ -30,21 +30,16 @@ function computeSnapshot(playback: Playback): PlaybackSnapshot {
  * Get an immutable snapshot of the current playback state.
  * Designed for use with React's `useSyncExternalStore` or similar patterns.
  *
- * When used with `subscribeSnapshot`, returns a referentially stable object
- * that only updates when a playback event fires — satisfying the
- * `useSyncExternalStore` contract. Without active subscribers, computes a
- * fresh snapshot on every call (suitable for polling / `onFrame`).
+ * Always returns a referentially stable (cached) object. The cache is updated
+ * by `subscribeSnapshot` (on playback events) and `onFrame` (every animation
+ * frame), so `getSnapshot` itself never computes a fresh snapshot — it only
+ * reads or initialises the cache. This guarantees the reference-equality
+ * contract required by `useSyncExternalStore`.
  */
 export function getSnapshot(playback: Playback): PlaybackSnapshot {
-  // With active subscribers, return the event-driven cached snapshot
-  // to guarantee referential stability between events.
-  const subs = subscriberCount.get(playback) ?? 0;
-  if (subs > 0) {
-    const cached = snapshotCache.get(playback);
-    if (cached) return cached;
-  }
+  const cached = snapshotCache.get(playback);
+  if (cached) return cached;
 
-  // No subscribers (standalone / polling): compute fresh and cache.
   const snap = computeSnapshot(playback);
   snapshotCache.set(playback, snap);
   return snap;
@@ -59,10 +54,16 @@ export function getSnapshot(playback: Playback): PlaybackSnapshot {
  *
  * ```ts
  * // React example:
- * const snap = useSyncExternalStore(
- *   (cb) => subscribeSnapshot(playback, cb),
- *   () => getSnapshot(playback),
+ * import { useCallback } from "react";
+ * const subscribe = useCallback(
+ *   (cb: () => void) => subscribeSnapshot(playback, cb),
+ *   [playback],
  * );
+ * const snap = useCallback(
+ *   () => getSnapshot(playback),
+ *   [playback],
+ * );
+ * const snapshot = useSyncExternalStore(subscribe, snap, snap);
  * ```
  */
 export function subscribeSnapshot(
@@ -114,7 +115,9 @@ export function onFrame(
   let rafId: number | null = null;
 
   function tick() {
-    callback(getSnapshot(playback));
+    const snap = computeSnapshot(playback);
+    snapshotCache.set(playback, snap);
+    callback(snap);
     rafId = requestAnimationFrame(tick);
   }
 

@@ -13,11 +13,11 @@ function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null
     },
     [playback],
   );
-  return useSyncExternalStore(
-    subscribe,
+  const snap = useCallback(
     () => (playback ? waa.getSnapshot(playback) : null),
-    () => null,
+    [playback],
   );
+  return useSyncExternalStore(subscribe, snap, snap);
 }
 
 // Usage example
@@ -57,11 +57,11 @@ function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null
     },
     [playback],
   );
-  return useSyncExternalStore(
-    subscribe,
+  const snap = useCallback(
     () => (playback ? getSnapshot(playback) : null),
-    () => null,
+    [playback],
   );
+  return useSyncExternalStore(subscribe, snap, snap);
 }
 
 // Usage example

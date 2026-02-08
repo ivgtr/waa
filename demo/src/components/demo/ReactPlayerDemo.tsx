@@ -11,11 +11,11 @@ function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null
     (cb: () => void) => (playback ? subscribeSnapshot(playback, cb) : () => {}),
     [playback],
   );
-  return useSyncExternalStore(
-    subscribe,
+  const snap = useCallback(
     () => (playback ? getSnapshot(playback) : null),
-    () => null,
+    [playback],
   );
+  return useSyncExternalStore(subscribe, snap, snap);
 }
 
 function Waveform({ peaks, progress }: { peaks: PeakPair[]; progress: number }) {
