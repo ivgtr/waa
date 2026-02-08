@@ -104,7 +104,11 @@
     "webaudio",
     "audiocontext",
     "composable",
-    "tree-shakeable"
+    "tree-shakeable",
+    "time-stretch",
+    "wsola",
+    "playback",
+    "pitch-preserving"
   ],
   "license": "MIT",
   "author": "ivgtr",
