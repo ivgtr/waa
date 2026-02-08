@@ -1,15 +1,15 @@
 ---
 title: WaaPlayer
-description: 全モジュールをラップするクラスベース API
+description: 封装所有模块的类 API
 ---
 
-`WaaPlayer` は waa-play の全モジュールをラップした統一的なクラスベースインターフェースを提供します。内部で `AudioContext` を管理します。
+`WaaPlayer` 提供了一个统一的、基于类的接口，封装了 waa-play 的所有模块。它在内部管理自己的 `AudioContext`。
 
 ```ts
 import { WaaPlayer } from "waa-play";
 ```
 
-## コンストラクタ
+## 构造函数
 
 ```ts
 new WaaPlayer();
@@ -17,7 +17,7 @@ new WaaPlayer(ctx: AudioContext);
 new WaaPlayer(options: WaaPlayerOptions);
 ```
 
-新しい WaaPlayer インスタンスを作成します。既存の `AudioContext` またはオプションオブジェクトを任意で渡せます。
+创建新的 WaaPlayer 实例。可以选择性地传入现有的 `AudioContext` 或选项对象。
 
 ```ts
 // Use default AudioContext
@@ -31,7 +31,7 @@ const player = new WaaPlayer(ctx);
 const player = new WaaPlayer({ sampleRate: 48000 });
 ```
 
-## プロパティ
+## 属性
 
 ### `ctx`
 
@@ -39,9 +39,9 @@ const player = new WaaPlayer({ sampleRate: 48000 });
 readonly ctx: AudioContext;
 ```
 
-内部の `AudioContext` インスタンス。
+底层的 `AudioContext` 实例。
 
-## コンテキストメソッド
+## 上下文方法
 
 ### `resume()`
 
@@ -49,7 +49,7 @@ readonly ctx: AudioContext;
 resume(): Promise<void>;
 ```
 
-一時停止中の AudioContext を再開します。`resumeContext(ctx)` と同等です。
+恢复已暂停的 AudioContext。等同于 `resumeContext(ctx)`。
 
 ### `ensureRunning()`
 
@@ -57,7 +57,7 @@ resume(): Promise<void>;
 ensureRunning(): Promise<void>;
 ```
 
-AudioContext が `running` 状態であることを保証します。
+确保 AudioContext 处于 `running` 状态。
 
 ### `now()`
 
@@ -65,9 +65,9 @@ AudioContext が `running` 状態であることを保証します。
 now(): number;
 ```
 
-AudioContext の現在時刻（`ctx.currentTime`）を返します。
+返回 AudioContext 的当前时间（`ctx.currentTime`）。
 
-## バッファメソッド
+## 缓冲区方法
 
 ### `load()`
 
@@ -75,7 +75,7 @@ AudioContext の現在時刻（`ctx.currentTime`）を返します。
 load(url: string, options?: LoadBufferOptions): Promise<AudioBuffer>;
 ```
 
-URL からオーディオファイルを取得してデコードします。
+从 URL 获取并解码音频文件。
 
 ```ts
 const buffer = await player.load("/audio/track.mp3", {
@@ -89,7 +89,7 @@ const buffer = await player.load("/audio/track.mp3", {
 loadFromBlob(blob: Blob): Promise<AudioBuffer>;
 ```
 
-`Blob` または `File` から AudioBuffer をデコードします。
+从 `Blob` 或 `File` 解码 AudioBuffer。
 
 ### `loadAll()`
 
@@ -97,7 +97,7 @@ loadFromBlob(blob: Blob): Promise<AudioBuffer>;
 loadAll(map: Record<string, string>): Promise<Map<string, AudioBuffer>>;
 ```
 
-複数のオーディオファイルを並行して読み込みます。
+并行加载多个音频文件。
 
 ```ts
 const buffers = await player.loadAll({
@@ -112,9 +112,9 @@ const buffers = await player.loadAll({
 getBufferInfo(buffer: AudioBuffer): BufferInfo;
 ```
 
-AudioBuffer のメタデータ（duration, channels, sampleRate, length）を取得します。
+获取 AudioBuffer 的元数据（duration, channels, sampleRate, length）。
 
-## 再生
+## 播放
 
 ### `play()`
 
@@ -122,7 +122,7 @@ AudioBuffer のメタデータ（duration, channels, sampleRate, length）を取
 play(buffer: AudioBuffer, options?: PlayOptions): Playback;
 ```
 
-AudioBuffer を再生します。制御可能な `Playback` ハンドルを返します。
+播放 AudioBuffer。返回可控的 `Playback` 句柄。
 
 ```ts
 const playback = player.play(buffer, {
@@ -132,9 +132,9 @@ const playback = player.play(buffer, {
 });
 ```
 
-`PlayOptions` と `Playback` の詳細は [play モジュール](/waa/api/play/) を参照してください。
+详见 [play 模块](/waa/zh-cn/api/play/) 了解 `PlayOptions` 和 `Playback` 的详情。
 
-## ノードファクトリ
+## 节点工厂
 
 ### `createGain()`
 
@@ -172,7 +172,7 @@ createCompressor(options?: { threshold?: number; knee?: number; ratio?: number; 
 rampGain(gain: GainNode, target: number, duration: number): void;
 ```
 
-GainNode の値をスムーズにリニアランプします。
+对 GainNode 的值进行平滑线性过渡。
 
 ### `getFrequencyData()`
 
@@ -192,7 +192,7 @@ getFrequencyDataByte(analyser: AnalyserNode): Uint8Array;
 chain(...nodes: AudioNode[]): void;
 ```
 
-オーディオノードを直列に接続します。
+将音频节点串联连接。
 
 ### `disconnectChain()`
 
@@ -200,7 +200,7 @@ chain(...nodes: AudioNode[]): void;
 disconnectChain(...nodes: AudioNode[]): void;
 ```
 
-接続済みのチェーンを切断します。
+断开已连接的节点链。
 
 ## 波形
 
@@ -210,7 +210,7 @@ disconnectChain(...nodes: AudioNode[]): void;
 extractPeaks(buffer: AudioBuffer, options?: ExtractPeaksOptions): number[];
 ```
 
-AudioBuffer から正規化されたピーク振幅 `[0, 1]` を抽出します。
+从 AudioBuffer 提取归一化的峰值振幅 `[0, 1]`。
 
 ### `extractPeakPairs()`
 
@@ -218,7 +218,7 @@ AudioBuffer から正規化されたピーク振幅 `[0, 1]` を抽出します�
 extractPeakPairs(buffer: AudioBuffer, options?: ExtractPeaksOptions): PeakPair[];
 ```
 
-波形描画用の min/max ピークペアを抽出します。
+提取用于波形渲染的 min/max 峰值对。
 
 ### `extractRMS()`
 
@@ -226,9 +226,9 @@ extractPeakPairs(buffer: AudioBuffer, options?: ExtractPeaksOptions): PeakPair[]
 extractRMS(buffer: AudioBuffer, options?: ExtractPeaksOptions): number[];
 ```
 
-RMS ラウドネス値 `[0, 1]` を抽出します。
+提取 RMS 响度值 `[0, 1]`。
 
-## フェード
+## 淡化
 
 ### `fadeIn()`
 
@@ -254,9 +254,9 @@ crossfade(gainA: GainNode, gainB: GainNode, options?: CrossfadeOptions): void;
 autoFade(playback: Playback, gain: GainNode, options?: AutoFadeOptions): () => void;
 ```
 
-再生開始時にフェードイン、終了前にフェードアウトを自動適用します。クリーンアップ関数を返します。
+在播放开始时自动应用淡入，在结束前自动应用淡出。返回清理函数。
 
-## スケジューラ
+## 调度器
 
 ### `createScheduler()`
 
@@ -270,7 +270,7 @@ createScheduler(options?: SchedulerOptions): Scheduler;
 createClock(options?: ClockOptions): Clock;
 ```
 
-## シンセ
+## 合成器
 
 ### `createSineBuffer()`
 
@@ -290,7 +290,7 @@ createNoiseBuffer(duration: number): AudioBuffer;
 createClickBuffer(frequency: number, duration: number): AudioBuffer;
 ```
 
-## アダプター
+## 适配器
 
 ### `getSnapshot()`
 
@@ -322,7 +322,7 @@ whenEnded(playback: Playback): Promise<void>;
 whenPosition(playback: Playback, position: number): Promise<void>;
 ```
 
-## ライフサイクル
+## 生命周期
 
 ### `dispose()`
 
@@ -330,4 +330,4 @@ whenPosition(playback: Playback, position: number): Promise<void>;
 dispose(): void;
 ```
 
-AudioContext を閉じ、すべてのリソースを解放します。`dispose()` 呼び出し後はインスタンスを使用しないでください。
+关闭 AudioContext 并释放所有资源。调用 `dispose()` 后不应再使用该实例。

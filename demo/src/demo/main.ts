@@ -3,6 +3,19 @@ import type { Playback, PeakPair, StretcherSnapshotExtension } from "waa";
 
 export function initDemo() {
   // ---------------------------------------------------------------------------
+  // i18n strings from data attributes
+  // ---------------------------------------------------------------------------
+
+  const wrapper = document.querySelector('.demo-wrapper') as HTMLElement;
+  const i18n = {
+    pause: wrapper?.dataset.i18nPause ?? 'Pause',
+    play: wrapper?.dataset.i18nPlay ?? 'Play',
+    loading: wrapper?.dataset.i18nLoading ?? 'Loading...',
+    loadFailed: wrapper?.dataset.i18nLoadFailed ?? 'Failed to load file',
+    loadFile: wrapper?.dataset.i18nLoadFile ?? 'Load Audio File',
+  };
+
+  // ---------------------------------------------------------------------------
   // DOM Elements
   // ---------------------------------------------------------------------------
 
@@ -83,12 +96,12 @@ export function initDemo() {
     if (state === "playing") {
       iconPlay.setAttribute("hidden", "");
       iconPause.removeAttribute("hidden");
-      btnPlayPause.title = "Pause";
+      btnPlayPause.title = i18n.pause;
       btnStop.disabled = false;
     } else {
       iconPause.setAttribute("hidden", "");
       iconPlay.removeAttribute("hidden");
-      btnPlayPause.title = "Play";
+      btnPlayPause.title = i18n.play;
       btnStop.disabled = state === "stopped";
     }
   }
@@ -142,7 +155,7 @@ export function initDemo() {
 
     // Show loading state
     fileLabel.classList.add("is-loading");
-    fileLabelText.textContent = "Loading...";
+    fileLabelText.textContent = i18n.loading;
     fileName.innerHTML = '<span class="spinner"></span>';
 
     try {
@@ -155,10 +168,10 @@ export function initDemo() {
       fileName.textContent = file.name;
       loadAudio(buffer);
     } catch {
-      fileName.textContent = "Failed to load file";
+      fileName.textContent = i18n.loadFailed;
     } finally {
       fileLabel.classList.remove("is-loading");
-      fileLabelText.textContent = "Load Audio File";
+      fileLabelText.textContent = i18n.loadFile;
     }
   });
 

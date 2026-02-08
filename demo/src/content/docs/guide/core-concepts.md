@@ -1,11 +1,11 @@
 ---
-title: Core Concepts
-description: Key design patterns and architecture of waa-play
+title: コアコンセプト
+description: waa-play の主要な設計パターンとアーキテクチャ
 ---
 
 ## BYO AudioContext
 
-Every function in waa-play takes an `AudioContext` as its first argument. The library never creates or stores a global context behind the scenes.
+waa-play のすべての関数は、第一引数に `AudioContext` を取ります。ライブラリが裏でグローバルコンテキストを作成・保持することはありません。
 
 ```ts
 import { play } from "waa-play/play";
@@ -16,22 +16,22 @@ const buffer = await loadBuffer(ctx, "/audio/track.mp3");
 const pb = play(ctx, buffer);
 ```
 
-This gives you full control over context lifecycle, sample rate, latency hints, and offline rendering.
+これにより、コンテキストのライフサイクル、サンプルレート、レイテンシーヒント、オフラインレンダリングを完全に制御できます。
 
-`WaaPlayer` wraps this pattern for convenience — it creates and manages an `AudioContext` internally, but the underlying design remains the same.
+`WaaPlayer` はこのパターンを便利に使えるようラップしたものです。内部で `AudioContext` を作成・管理しますが、基本設計は同じです。
 
-## Playback State Machine
+## 再生ステートマシン
 
-The `Playback` object returned by `play()` follows a simple state machine:
+`play()` が返す `Playback` オブジェクトは、シンプルなステートマシンに従います:
 
 ```
 playing → paused → playing → stopped
 playing → stopped
 ```
 
-- **playing** — audio is actively outputting. Position advances based on `AudioContext.currentTime` (hardware-clock accuracy, not JavaScript timers).
-- **paused** — audio output is suspended. Position is frozen at the pause point.
-- **stopped** — terminal state. The source node is released and cannot be restarted. Create a new `Playback` to play again.
+- **playing** — オーディオを出力中。ポジションは `AudioContext.currentTime`(ハードウェアクロック精度、JavaScript タイマーではない)に基づいて進みます。
+- **paused** — オーディオ出力が一時停止中。ポジションは一時停止時点で凍結されます。
+- **stopped** — 終端状態。ソースノードは解放され、再開できません。再度再生するには新しい `Playback` を作成してください。
 
 ```ts
 const pb = play(ctx, buffer);
@@ -43,9 +43,9 @@ pb.stop();            // → stopped (from any state)
 console.log(pb.state) // "playing" | "paused" | "stopped"
 ```
 
-## Event System
+## イベントシステム
 
-Playback emits type-safe events via an `on` / `off` pattern:
+Playback は `on` / `off` パターンで型安全なイベントを発行します:
 
 ```ts
 pb.on("statechange", ({ state }) => {
@@ -61,11 +61,11 @@ pb.on("ended", () => {
 });
 ```
 
-**Background tab support**: `timeupdate` fires via `setInterval`, not `requestAnimationFrame`. This means position updates keep working even when the browser tab is in the background.
+**バックグラウンドタブ対応**: `timeupdate` は `requestAnimationFrame` ではなく `setInterval` で発火します。これにより、ブラウザタブがバックグラウンドにあってもポジション更新が継続します。
 
-## Tree-shaking
+## ツリーシェイキング
 
-waa-play is split into 11 independent modules (plus the `WaaPlayer` class entry), each with its own subpath export. Your bundler only includes the modules you actually import.
+waa-play は 11 の独立モジュール(+ `WaaPlayer` クラスエントリ)に分割されており、各モジュールは独自のサブパスエクスポートを持っています。バンドラーは実際にインポートしたモジュールのみを含めます。
 
 ```ts
 // Only the play and buffer modules end up in your bundle
@@ -73,15 +73,15 @@ import { play } from "waa-play/play";
 import { loadBuffer } from "waa-play/buffer";
 ```
 
-If you use `WaaPlayer` from the top-level `waa-play` import, all modules are included since the class wraps them all.
+トップレベルの `waa-play` インポートから `WaaPlayer` を使用すると、クラスがすべてをラップしているため、全モジュールが含まれます。
 
-## Pitch-preserving Time-stretch
+## ピッチ保持タイムストレッチ
 
-The `stretcher` module provides real-time tempo change without altering pitch, using the WSOLA (Waveform Similarity Overlap-Add) algorithm.
+`stretcher` モジュールは、WSOLA(Waveform Similarity Overlap-Add)アルゴリズムを使用して、ピッチを変えずにリアルタイムでテンポを変更します。
 
-- **Web Worker processing** — WSOLA runs in a separate thread, keeping the main thread responsive.
-- **Streaming architecture** — the source audio is split into chunks, converted at the target tempo, and buffered for gapless playback.
-- **Real-time tempo control** — change the tempo during playback; the stretcher re-processes upcoming chunks on the fly.
+- **Web Worker 処理** — WSOLA は別スレッドで実行され、メインスレッドの応答性を維持します。
+- **ストリーミングアーキテクチャ** — ソースオーディオをチャンクに分割し、目標テンポで変換してギャップレス再生のためにバッファリングします。
+- **リアルタイムテンポ制御** — 再生中にテンポを変更可能。ストレッチャーが今後のチャンクをオンザフライで再処理します。
 
 ```ts
 import { createStretcher } from "waa-play/stretcher";

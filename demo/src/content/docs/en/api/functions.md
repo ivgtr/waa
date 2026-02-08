@@ -1,9 +1,9 @@
 ---
-title: 関数 API
-description: ツリーシェイク可能な関数モジュール
+title: Function API
+description: Tree-shakeable function modules
 ---
 
-モジュールごとに整理された、ツリーシェイク可能な個別関数です。各関数は `AudioContext` を第一引数に取ります（BYO Context パターン）。
+Individual, tree-shakeable functions grouped by module. Each function takes an `AudioContext` as its first argument (BYO Context pattern).
 
 ```ts
 import { createContext } from "waa-play/context";
@@ -19,7 +19,7 @@ const playback = play(ctx, buffer);
 
 ## play
 
-コア再生エンジン。`AudioBufferSourceNode` をステートマシン、ポジショントラッキング、イベントシステムでラップします。
+Core playback engine. Wraps `AudioBufferSourceNode` with a state machine, position tracking, and event system.
 
 ```ts
 import { play } from "waa-play/play";
@@ -31,7 +31,7 @@ import { play } from "waa-play/play";
 play(ctx: AudioContext, buffer: AudioBuffer, options?: PlayOptions): Playback;
 ```
 
-AudioBuffer を再生します。制御可能な `Playback` ハンドルを返します。
+Play an AudioBuffer. Returns a controllable `Playback` handle.
 
 ```ts
 const playback = play(ctx, buffer, {
@@ -44,19 +44,19 @@ const playback = play(ctx, buffer, {
 
 ### PlayOptions
 
-| オプション | 型 | デフォルト | 説明 |
+| Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `offset` | `number` | `0` | 開始位置（秒） |
-| `loop` | `boolean` | `false` | ループを有効にする |
-| `loopStart` | `number` | `0` | ループ開始点（秒） |
-| `loopEnd` | `number` | `duration` | ループ終了点（秒） |
-| `playbackRate` | `number` | `1` | 再生速度倍率 |
-| `through` | `AudioNode[]` | `[]` | 経由するオーディオノード（エフェクトチェーン） |
-| `destination` | `AudioNode` | `ctx.destination` | 出力先ノード |
-| `timeupdateInterval` | `number` | `250` | `timeupdate` イベントの間隔（ms） |
-| `preservePitch` | `boolean` | `false` | 再生速度変更時にピッチを保持（stretcher エンジンを使用） |
+| `offset` | `number` | `0` | Start position in seconds |
+| `loop` | `boolean` | `false` | Enable looping |
+| `loopStart` | `number` | `0` | Loop start point in seconds |
+| `loopEnd` | `number` | `duration` | Loop end point in seconds |
+| `playbackRate` | `number` | `1` | Playback speed multiplier |
+| `through` | `AudioNode[]` | `[]` | Audio nodes to route through (effects chain) |
+| `destination` | `AudioNode` | `ctx.destination` | Output destination node |
+| `timeupdateInterval` | `number` | `250` | Interval for `timeupdate` events in ms |
+| `preservePitch` | `boolean` | `false` | Preserve pitch when changing playback rate (uses stretcher engine) |
 
-### Playback メソッド
+### Playback Methods
 
 ```ts
 // State
@@ -84,21 +84,21 @@ off(event: string, handler: Function): void;
 dispose(): void;
 ```
 
-### Playback イベント
+### Playback Events
 
-| イベント | ペイロード | 説明 |
+| Event | Payload | Description |
 |-------|---------|-------------|
-| `play` | - | 再生開始 |
-| `pause` | - | 一時停止 |
-| `resume` | - | 一時停止から再開 |
-| `seek` | `number` | 指定位置にシーク（秒） |
-| `stop` | - | 再生停止 |
-| `ended` | - | 自然に終了 |
-| `loop` | - | 先頭にループ |
-| `statechange` | `PlaybackState` | 状態が変化 |
-| `timeupdate` | `number` | ポジション更新（`timeupdateInterval` 間隔で発火） |
-| `buffering` | - | ストレッチャーエンジンがバッファリング中 |
-| `buffered` | - | ストレッチャーエンジンのバッファリング完了 |
+| `play` | - | Playback started |
+| `pause` | - | Playback paused |
+| `resume` | - | Resumed from pause |
+| `seek` | `number` | Seeked to position (seconds) |
+| `stop` | - | Playback stopped |
+| `ended` | - | Reached end naturally |
+| `loop` | - | Looped back to start |
+| `statechange` | `PlaybackState` | State changed |
+| `timeupdate` | `number` | Position updated (fires at `timeupdateInterval`) |
+| `buffering` | - | Stretcher engine is buffering |
+| `buffered` | - | Stretcher engine buffering complete |
 
 ### PlaybackSnapshot
 
@@ -116,7 +116,7 @@ interface PlaybackSnapshot {
 
 ## context
 
-AudioContext ライフサイクルユーティリティ。
+AudioContext lifecycle utilities.
 
 ```ts
 import { createContext, resumeContext, ensureRunning, now } from "waa-play/context";
@@ -134,7 +134,7 @@ createContext(options?: { sampleRate?: number; latencyHint?: AudioContextLatency
 resumeContext(ctx: AudioContext): Promise<void>;
 ```
 
-一時停止中の AudioContext を再開します。ユーザージェスチャーハンドラから呼び出してください。
+Resume a suspended AudioContext. Call from a user gesture handler.
 
 ### `ensureRunning()`
 
@@ -142,7 +142,7 @@ resumeContext(ctx: AudioContext): Promise<void>;
 ensureRunning(ctx: AudioContext): Promise<void>;
 ```
 
-AudioContext が `"running"` 状態であることを保証します。複数回呼び出しても安全です。
+Ensure the AudioContext is in the `"running"` state. Safe to call multiple times.
 
 ### `now()`
 
@@ -150,13 +150,13 @@ AudioContext が `"running"` 状態であることを保証します。複数回
 now(ctx: AudioContext): number;
 ```
 
-`ctx.currentTime` のショートハンド。
+Shorthand for `ctx.currentTime`.
 
 ---
 
 ## buffer
 
-オーディオファイルの読み込みとデコード。
+Audio file loading and decoding.
 
 ```ts
 import { loadBuffer, loadBufferFromBlob, loadBuffers, getBufferInfo } from "waa-play/buffer";
@@ -168,7 +168,7 @@ import { loadBuffer, loadBufferFromBlob, loadBuffers, getBufferInfo } from "waa-
 loadBuffer(ctx: AudioContext, url: string, options?: { onProgress?: (progress: number) => void }): Promise<AudioBuffer>;
 ```
 
-オーディオファイルを取得してデコードします。`onProgress`（0–1）で進捗をトラッキングできます。
+Fetch and decode an audio file. Supports progress tracking via `onProgress` (0–1).
 
 ### `loadBufferFromBlob()`
 
@@ -176,7 +176,7 @@ loadBuffer(ctx: AudioContext, url: string, options?: { onProgress?: (progress: n
 loadBufferFromBlob(ctx: AudioContext, blob: Blob): Promise<AudioBuffer>;
 ```
 
-Blob または File から AudioBuffer をデコードします。
+Decode an AudioBuffer from a Blob or File.
 
 ### `loadBuffers()`
 
@@ -184,7 +184,7 @@ Blob または File から AudioBuffer をデコードします。
 loadBuffers(ctx: AudioContext, map: Record<string, string>): Promise<Map<string, AudioBuffer>>;
 ```
 
-キーと URL のマップから複数のオーディオファイルを並行して読み込みます。
+Load multiple audio files in parallel from a key-URL map.
 
 ### `getBufferInfo()`
 
@@ -196,13 +196,13 @@ getBufferInfo(buffer: AudioBuffer): { duration: number; numberOfChannels: number
 
 ## nodes
 
-オーディオノードファクトリとルーティングユーティリティ。
+Audio node factories and routing utilities.
 
 ```ts
 import { createGain, rampGain, createAnalyser, createFilter, createPanner, createCompressor, chain, disconnectChain } from "waa-play/nodes";
 ```
 
-### ノードファクトリ
+### Node Factories
 
 ```ts
 createGain(ctx: AudioContext, initialValue?: number): GainNode;
@@ -212,7 +212,7 @@ createPanner(ctx: AudioContext, pan?: number): StereoPannerNode;
 createCompressor(ctx: AudioContext, options?: { threshold?: number; knee?: number; ratio?: number; attack?: number; release?: number }): DynamicsCompressorNode;
 ```
 
-### ユーティリティ
+### Utilities
 
 ```ts
 rampGain(gain: GainNode, target: number, duration: number): void;
@@ -220,18 +220,18 @@ getFrequencyData(analyser: AnalyserNode): Float32Array;
 getFrequencyDataByte(analyser: AnalyserNode): Uint8Array;
 ```
 
-### ルーティング
+### Routing
 
 ```ts
-chain(...nodes: AudioNode[]): void;           // ノードを直列に接続
-disconnectChain(...nodes: AudioNode[]): void;  // チェーン接続を切断
+chain(...nodes: AudioNode[]): void;           // Connect nodes in series
+disconnectChain(...nodes: AudioNode[]): void;  // Disconnect chained nodes
 ```
 
 ---
 
 ## emitter
 
-最小限の型安全イベントエミッター。
+Minimal, type-safe event emitter.
 
 ```ts
 import { createEmitter } from "waa-play/emitter";
@@ -252,7 +252,7 @@ emitter.emit("progress", 0.5);
 emitter.clear();  // Remove all handlers
 ```
 
-### Emitter メソッド
+### Emitter Methods
 
 ```ts
 on<K>(event: K, handler: (data: Events[K]) => void): () => void;
@@ -265,13 +265,13 @@ clear(event?: keyof Events): void;
 
 ## waveform
 
-AudioBuffer からビジュアル波形データを抽出。
+Extract visual waveform data from AudioBuffer.
 
 ```ts
 import { extractPeaks, extractPeakPairs, extractRMS } from "waa-play/waveform";
 ```
 
-### 関数
+### Functions
 
 ```ts
 extractPeaks(buffer: AudioBuffer, options?: ExtractPeaksOptions): number[];
@@ -279,26 +279,26 @@ extractPeakPairs(buffer: AudioBuffer, options?: ExtractPeaksOptions): PeakPair[]
 extractRMS(buffer: AudioBuffer, options?: ExtractPeaksOptions): number[];
 ```
 
-### オプション
+### Options
 
-| オプション | 型 | デフォルト | 説明 |
+| Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `resolution` | `number` | `200` | 抽出するデータポイント数 |
-| `channel` | `number` | `0` | チャンネルインデックス（`-1` で全チャンネル） |
+| `resolution` | `number` | `200` | Number of data points to extract |
+| `channel` | `number` | `0` | Channel index (`-1` for all channels) |
 
-`PeakPair` は `{ min: number; max: number }` です。
+`PeakPair` is `{ min: number; max: number }`.
 
 ---
 
 ## fade
 
-GainNode オートメーションによるフェードイン/アウトとクロスフェードユーティリティ。
+Fade in/out and crossfade utilities using GainNode automation.
 
 ```ts
 import { fadeIn, fadeOut, crossfade, autoFade } from "waa-play/fade";
 ```
 
-### 関数
+### Functions
 
 ```ts
 fadeIn(gain: GainNode, target: number, options?: FadeOptions): void;
@@ -307,22 +307,22 @@ crossfade(gainA: GainNode, gainB: GainNode, options?: CrossfadeOptions): void;
 autoFade(playback: Playback, gain: GainNode, options?: AutoFadeOptions): () => void;
 ```
 
-`autoFade` は開始時にフェードイン、終了前にフェードアウトを適用します。クリーンアップ関数を返します。
+`autoFade` applies fade-in on start and fade-out before end. Returns a cleanup function.
 
-### オプション
+### Options
 
-| オプション | 型 | デフォルト | 説明 |
+| Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `duration` | `number` | `1` | フェード時間（秒） |
+| `duration` | `number` | `1` | Fade duration in seconds |
 | `curve` | `FadeCurve` | `"linear"` | `"linear"` \| `"exponential"` \| `"equal-power"` |
 
-`AutoFadeOptions` は `duration` の代わりに `fadeIn` / `fadeOut`（秒）を使用します。
+`AutoFadeOptions` uses `fadeIn` / `fadeOut` (seconds) instead of `duration`.
 
 ---
 
 ## scheduler
 
-先読みベースのイベントスケジューラと BPM クロック。
+Lookahead-based event scheduler and BPM clock.
 
 ```ts
 import { createScheduler, createClock } from "waa-play/scheduler";
@@ -334,12 +334,12 @@ import { createScheduler, createClock } from "waa-play/scheduler";
 createScheduler(ctx: AudioContext, options?: { lookahead?: number; interval?: number }): Scheduler;
 ```
 
-| オプション | 型 | デフォルト | 説明 |
+| Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `lookahead` | `number` | `0.1` | 先読み時間（秒） |
-| `interval` | `number` | `25` | タイマー間隔（ms） |
+| `lookahead` | `number` | `0.1` | How far ahead to schedule (seconds) |
+| `interval` | `number` | `25` | Timer interval (ms) |
 
-**Scheduler メソッド:** `schedule(id, time, callback)`, `cancel(id)`, `start()`, `stop()`, `dispose()`.
+**Scheduler methods:** `schedule(id, time, callback)`, `cancel(id)`, `start()`, `stop()`, `dispose()`.
 
 ### `createClock()`
 
@@ -347,15 +347,15 @@ createScheduler(ctx: AudioContext, options?: { lookahead?: number; interval?: nu
 createClock(ctx: AudioContext, options?: { bpm?: number }): Clock;
 ```
 
-BPM ベースのクロック。デフォルト `120` BPM。
+BPM-based clock. Default `120` BPM.
 
-**Clock メソッド:** `beatToTime(beat)`, `getCurrentBeat()`, `getNextBeatTime()`, `setBpm(bpm)`, `getBpm()`.
+**Clock methods:** `beatToTime(beat)`, `getCurrentBeat()`, `getNextBeatTime()`, `setBpm(bpm)`, `getBpm()`.
 
 ---
 
 ## synth
 
-合成オーディオバッファを生成。
+Generate synthetic audio buffers.
 
 ```ts
 import { createSineBuffer, createNoiseBuffer, createClickBuffer } from "waa-play/synth";
@@ -371,13 +371,13 @@ createClickBuffer(ctx: AudioContext, frequency: number, duration: number): Audio
 
 ## adapters
 
-フレームワーク統合ユーティリティ。React の `useSyncExternalStore` と互換性があります。
+Framework integration utilities. Compatible with React's `useSyncExternalStore`.
 
 ```ts
 import { getSnapshot, subscribeSnapshot, onFrame, whenEnded, whenPosition } from "waa-play/adapters";
 ```
 
-### 関数
+### Functions
 
 ```ts
 getSnapshot(playback: Playback): PlaybackSnapshot;
@@ -387,7 +387,7 @@ whenEnded(playback: Playback): Promise<void>;
 whenPosition(playback: Playback, position: number): Promise<void>;
 ```
 
-### React の例
+### React Example
 
 ```tsx
 import { useSyncExternalStore } from "react";

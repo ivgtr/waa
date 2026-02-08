@@ -1,16 +1,16 @@
 ---
-title: stretcher
-description: Pitch-preserving time-stretch engine
+title: Stretcher
+description: ピッチ保持タイムストレッチエンジン
 ---
 
-A WSOLA (Waveform Similarity Overlap-Add) time-stretch engine that changes playback speed without affecting pitch. Uses Web Workers for real-time audio processing.
+WSOLA（Waveform Similarity Overlap-Add）タイムストレッチエンジンで、ピッチに影響を与えずに再生速度を変更します。Web Worker を使用してリアルタイムオーディオ処理を行います。
 
 ```ts
 import { createStretcherEngine } from "waa-play/stretcher";
 ```
 
 :::note
-The stretcher engine is usually used indirectly through `play()` with `preservePitch: true`. Direct usage is for advanced scenarios.
+ストレッチャーエンジンは通常、`play()` に `preservePitch: true` を指定して間接的に使用します。直接使用は高度なシナリオ向けです。
 :::
 
 ## `createStretcherEngine()`
@@ -23,7 +23,7 @@ createStretcherEngine(
 ): StretcherEngine;
 ```
 
-Create a WSOLA time-stretch engine for the given buffer.
+指定されたバッファに対して WSOLA タイムストレッチエンジンを作成します。
 
 ```ts
 const engine = createStretcherEngine(ctx, buffer, {
@@ -48,19 +48,19 @@ interface StretcherOptions {
 }
 ```
 
-| Option | Type | Default | Description |
+| オプション | 型 | デフォルト | 説明 |
 |--------|------|---------|-------------|
-| `tempo` | `number` | `1` | Time-stretch ratio (0.5 = half speed, 2 = double speed) |
-| `offset` | `number` | `0` | Start position in seconds |
-| `loop` | `boolean` | `false` | Loop playback |
-| `through` | `AudioNode[]` | `[]` | Audio nodes to route through |
-| `destination` | `AudioNode` | `ctx.destination` | Output destination |
-| `timeupdateInterval` | `number` | `250` | Interval for progress events in ms |
-| `workerPoolSize` | `number` | - | Number of WSOLA worker threads |
+| `tempo` | `number` | `1` | タイムストレッチ比率（0.5 = 半速、2 = 倍速） |
+| `offset` | `number` | `0` | 開始位置（秒） |
+| `loop` | `boolean` | `false` | ループ再生 |
+| `through` | `AudioNode[]` | `[]` | 経由するオーディオノード |
+| `destination` | `AudioNode` | `ctx.destination` | 出力先 |
+| `timeupdateInterval` | `number` | `250` | 進捗イベントの間隔（ms） |
+| `workerPoolSize` | `number` | - | WSOLA ワーカースレッド数 |
 
-## StretcherEngine Methods
+## StretcherEngine メソッド
 
-### Playback Control
+### 再生制御
 
 ```ts
 start(): void;
@@ -70,19 +70,19 @@ seek(position: number): void;
 stop(): void;
 ```
 
-### Configuration
+### 設定
 
 ```ts
 setTempo(tempo: number): void;
 ```
 
-Change the time-stretch ratio during playback.
+再生中にタイムストレッチ比率を変更します。
 
 ```ts
 engine.setTempo(1.5); // Speed up to 1.5x
 ```
 
-### State
+### 状態
 
 ```ts
 getCurrentPosition(): number;
@@ -90,33 +90,33 @@ getStatus(): StretcherStatus;
 getSnapshot(): PlaybackSnapshot;
 ```
 
-### Events
+### イベント
 
 ```ts
 on(event: string, handler: Function): () => void;
 off(event: string, handler: Function): void;
 ```
 
-### Cleanup
+### クリーンアップ
 
 ```ts
 dispose(): void;
 ```
 
-Stop playback, terminate workers, and release all resources.
+再生を停止し、ワーカーを終了し、すべてのリソースを解放します。
 
-## Events
+## イベント
 
-| Event | Description |
+| イベント | 説明 |
 |-------|-------------|
-| `progress` | Position updated |
-| `bufferhealth` | Buffer health status changed |
-| `buffering` | Worker buffer underrun, audio may stutter |
-| `buffered` | Buffer recovered from underrun |
-| `chunkready` | A new chunk has been processed |
-| `complete` | All chunks have been processed |
-| `ended` | Playback reached the end |
-| `error` | An error occurred in a worker |
+| `progress` | ポジション更新 |
+| `bufferhealth` | バッファヘルスの状態が変化 |
+| `buffering` | ワーカーバッファアンダーラン、音声が途切れる可能性あり |
+| `buffered` | アンダーランから回復 |
+| `chunkready` | 新しいチャンクの処理が完了 |
+| `complete` | すべてのチャンクの処理が完了 |
+| `ended` | 再生が終端に到達 |
+| `error` | ワーカーでエラーが発生 |
 
 ## StretcherStatus
 
@@ -129,11 +129,11 @@ interface StretcherStatus {
 }
 ```
 
-Detailed status object containing information about the engine's internal state, including conversion progress, buffer health, and playback position.
+エンジンの内部状態（変換進捗、バッファヘルス、再生位置）に関する詳細なステータスオブジェクト。
 
-## Usage via play()
+## play() 経由の使用
 
-The simplest way to use the stretcher is through the `play()` function with `preservePitch: true`:
+ストレッチャーを使用する最も簡単な方法は、`play()` 関数に `preservePitch: true` を指定することです:
 
 ```ts
 import { play } from "waa-play/play";

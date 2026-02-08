@@ -1,15 +1,15 @@
 ---
 title: WaaPlayer
-description: 全モジュールをラップするクラスベース API
+description: Class-based API wrapping all modules
 ---
 
-`WaaPlayer` は waa-play の全モジュールをラップした統一的なクラスベースインターフェースを提供します。内部で `AudioContext` を管理します。
+`WaaPlayer` provides a unified, class-based interface that wraps all waa-play modules. It manages its own `AudioContext` internally.
 
 ```ts
 import { WaaPlayer } from "waa-play";
 ```
 
-## コンストラクタ
+## Constructor
 
 ```ts
 new WaaPlayer();
@@ -17,7 +17,7 @@ new WaaPlayer(ctx: AudioContext);
 new WaaPlayer(options: WaaPlayerOptions);
 ```
 
-新しい WaaPlayer インスタンスを作成します。既存の `AudioContext` またはオプションオブジェクトを任意で渡せます。
+Create a new WaaPlayer instance. You can optionally pass an existing `AudioContext` or an options object.
 
 ```ts
 // Use default AudioContext
@@ -31,7 +31,7 @@ const player = new WaaPlayer(ctx);
 const player = new WaaPlayer({ sampleRate: 48000 });
 ```
 
-## プロパティ
+## Properties
 
 ### `ctx`
 
@@ -39,9 +39,9 @@ const player = new WaaPlayer({ sampleRate: 48000 });
 readonly ctx: AudioContext;
 ```
 
-内部の `AudioContext` インスタンス。
+The underlying `AudioContext` instance.
 
-## コンテキストメソッド
+## Context Methods
 
 ### `resume()`
 
@@ -49,7 +49,7 @@ readonly ctx: AudioContext;
 resume(): Promise<void>;
 ```
 
-一時停止中の AudioContext を再開します。`resumeContext(ctx)` と同等です。
+Resume the suspended AudioContext. Equivalent to `resumeContext(ctx)`.
 
 ### `ensureRunning()`
 
@@ -57,7 +57,7 @@ resume(): Promise<void>;
 ensureRunning(): Promise<void>;
 ```
 
-AudioContext が `running` 状態であることを保証します。
+Ensure the AudioContext is in the `running` state.
 
 ### `now()`
 
@@ -65,9 +65,9 @@ AudioContext が `running` 状態であることを保証します。
 now(): number;
 ```
 
-AudioContext の現在時刻（`ctx.currentTime`）を返します。
+Returns the current time of the AudioContext (`ctx.currentTime`).
 
-## バッファメソッド
+## Buffer Methods
 
 ### `load()`
 
@@ -75,7 +75,7 @@ AudioContext の現在時刻（`ctx.currentTime`）を返します。
 load(url: string, options?: LoadBufferOptions): Promise<AudioBuffer>;
 ```
 
-URL からオーディオファイルを取得してデコードします。
+Fetch and decode an audio file from a URL.
 
 ```ts
 const buffer = await player.load("/audio/track.mp3", {
@@ -89,7 +89,7 @@ const buffer = await player.load("/audio/track.mp3", {
 loadFromBlob(blob: Blob): Promise<AudioBuffer>;
 ```
 
-`Blob` または `File` から AudioBuffer をデコードします。
+Decode an AudioBuffer from a `Blob` or `File`.
 
 ### `loadAll()`
 
@@ -97,7 +97,7 @@ loadFromBlob(blob: Blob): Promise<AudioBuffer>;
 loadAll(map: Record<string, string>): Promise<Map<string, AudioBuffer>>;
 ```
 
-複数のオーディオファイルを並行して読み込みます。
+Load multiple audio files in parallel.
 
 ```ts
 const buffers = await player.loadAll({
@@ -112,9 +112,9 @@ const buffers = await player.loadAll({
 getBufferInfo(buffer: AudioBuffer): BufferInfo;
 ```
 
-AudioBuffer のメタデータ（duration, channels, sampleRate, length）を取得します。
+Get metadata about an AudioBuffer (duration, channels, sampleRate, length).
 
-## 再生
+## Playback
 
 ### `play()`
 
@@ -122,7 +122,7 @@ AudioBuffer のメタデータ（duration, channels, sampleRate, length）を取
 play(buffer: AudioBuffer, options?: PlayOptions): Playback;
 ```
 
-AudioBuffer を再生します。制御可能な `Playback` ハンドルを返します。
+Play an AudioBuffer. Returns a controllable `Playback` handle.
 
 ```ts
 const playback = player.play(buffer, {
@@ -132,9 +132,9 @@ const playback = player.play(buffer, {
 });
 ```
 
-`PlayOptions` と `Playback` の詳細は [play モジュール](/waa/api/play/) を参照してください。
+See [play module](/waa/en/api/play/) for `PlayOptions` and `Playback` details.
 
-## ノードファクトリ
+## Node Factories
 
 ### `createGain()`
 
@@ -172,7 +172,7 @@ createCompressor(options?: { threshold?: number; knee?: number; ratio?: number; 
 rampGain(gain: GainNode, target: number, duration: number): void;
 ```
 
-GainNode の値をスムーズにリニアランプします。
+Smooth linear ramp of a GainNode's value.
 
 ### `getFrequencyData()`
 
@@ -192,7 +192,7 @@ getFrequencyDataByte(analyser: AnalyserNode): Uint8Array;
 chain(...nodes: AudioNode[]): void;
 ```
 
-オーディオノードを直列に接続します。
+Connect audio nodes in series.
 
 ### `disconnectChain()`
 
@@ -200,9 +200,9 @@ chain(...nodes: AudioNode[]): void;
 disconnectChain(...nodes: AudioNode[]): void;
 ```
 
-接続済みのチェーンを切断します。
+Disconnect previously chained nodes.
 
-## 波形
+## Waveform
 
 ### `extractPeaks()`
 
@@ -210,7 +210,7 @@ disconnectChain(...nodes: AudioNode[]): void;
 extractPeaks(buffer: AudioBuffer, options?: ExtractPeaksOptions): number[];
 ```
 
-AudioBuffer から正規化されたピーク振幅 `[0, 1]` を抽出します。
+Extract normalized peak amplitudes `[0, 1]` from an AudioBuffer.
 
 ### `extractPeakPairs()`
 
@@ -218,7 +218,7 @@ AudioBuffer から正規化されたピーク振幅 `[0, 1]` を抽出します�
 extractPeakPairs(buffer: AudioBuffer, options?: ExtractPeaksOptions): PeakPair[];
 ```
 
-波形描画用の min/max ピークペアを抽出します。
+Extract min/max peak pairs for waveform rendering.
 
 ### `extractRMS()`
 
@@ -226,9 +226,9 @@ extractPeakPairs(buffer: AudioBuffer, options?: ExtractPeaksOptions): PeakPair[]
 extractRMS(buffer: AudioBuffer, options?: ExtractPeaksOptions): number[];
 ```
 
-RMS ラウドネス値 `[0, 1]` を抽出します。
+Extract RMS loudness values `[0, 1]`.
 
-## フェード
+## Fade
 
 ### `fadeIn()`
 
@@ -254,9 +254,9 @@ crossfade(gainA: GainNode, gainB: GainNode, options?: CrossfadeOptions): void;
 autoFade(playback: Playback, gain: GainNode, options?: AutoFadeOptions): () => void;
 ```
 
-再生開始時にフェードイン、終了前にフェードアウトを自動適用します。クリーンアップ関数を返します。
+Automatically apply fade-in on play and fade-out before end. Returns a cleanup function.
 
-## スケジューラ
+## Scheduler
 
 ### `createScheduler()`
 
@@ -270,7 +270,7 @@ createScheduler(options?: SchedulerOptions): Scheduler;
 createClock(options?: ClockOptions): Clock;
 ```
 
-## シンセ
+## Synth
 
 ### `createSineBuffer()`
 
@@ -290,7 +290,7 @@ createNoiseBuffer(duration: number): AudioBuffer;
 createClickBuffer(frequency: number, duration: number): AudioBuffer;
 ```
 
-## アダプター
+## Adapters
 
 ### `getSnapshot()`
 
@@ -322,7 +322,7 @@ whenEnded(playback: Playback): Promise<void>;
 whenPosition(playback: Playback, position: number): Promise<void>;
 ```
 
-## ライフサイクル
+## Lifecycle
 
 ### `dispose()`
 
@@ -330,4 +330,4 @@ whenPosition(playback: Playback, position: number): Promise<void>;
 dispose(): void;
 ```
 
-AudioContext を閉じ、すべてのリソースを解放します。`dispose()` 呼び出し後はインスタンスを使用しないでください。
+Close the AudioContext and release all resources. The instance should not be used after calling `dispose()`.

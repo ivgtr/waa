@@ -1,35 +1,35 @@
 ---
 title: waa-play
-description: Composable & batteries-included Web Audio API toolkit
+description: コンポーザブル & バッテリー同梱の Web Audio API ツールキット
 template: splash
 hero:
   title: waa-play
-  tagline: Composable & batteries-included Web Audio API toolkit
+  tagline: コンポーザブル & バッテリー同梱の Web Audio API ツールキット
   actions:
-    - text: Getting Started
+    - text: はじめに
       link: /waa/guide/getting-started/
       icon: right-arrow
       variant: primary
-    - text: Live Demo
+    - text: ライブデモ
       link: /waa/demo/
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Features
+## 機能
 
 <CardGrid>
-  <Card title="Pitch-preserving Time-stretch" icon="rocket">
-    WSOLA-based streaming playback with real-time tempo change. Processing runs in a separate thread.
+  <Card title="ピッチ保持タイムストレッチ" icon="rocket">
+    WSOLA ベースのストリーミング再生で、リアルタイムにテンポを変更。処理は別スレッドで実行されます。
   </Card>
   <Card title="BYO AudioContext" icon="setting">
-    Every function takes an AudioContext as its first argument. No hidden global state.
+    すべての関数が AudioContext を第一引数に取ります。隠れたグローバルステートはありません。
   </Card>
-  <Card title="Tree-shakeable" icon="seti:json">
-    11 independent modules with separate entry points. Import only what you need.
+  <Card title="ツリーシェイク対応" icon="seti:json">
+    11 の独立モジュールと個別エントリポイント。必要なものだけインポートできます。
   </Card>
-  <Card title="Framework Adapters" icon="puzzle">
-    Built-in snapshot-based integration for React, Vue, Svelte, and any framework.
+  <Card title="フレームワークアダプター" icon="puzzle">
+    React、Vue、Svelte など、あらゆるフレームワーク向けのスナップショットベース統合を内蔵。
   </Card>
 </CardGrid>
