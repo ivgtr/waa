@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`waa` is a composable Web Audio API utility library. Zero dependencies, tree-shakeable, framework-agnostic, BYO AudioContext.
+`waa-play` is a composable Web Audio API utility library. Zero dependencies, tree-shakeable, framework-agnostic, BYO AudioContext.
 
 ## Commands
 
