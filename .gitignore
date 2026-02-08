@@ -4,3 +4,4 @@ dist/
 .DS_Store
 /docs/
 demo/.astro/
+.playwright-mcp/
