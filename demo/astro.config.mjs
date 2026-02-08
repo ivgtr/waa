@@ -27,6 +27,9 @@ export default defineConfig({
           items: [
             { label: 'はじめに', translations: { en: 'Getting Started', 'zh-CN': '快速开始' }, slug: 'guide/getting-started' },
             { label: 'コアコンセプト', translations: { en: 'Core Concepts', 'zh-CN': '核心概念' }, slug: 'guide/core-concepts' },
+            { label: 'Stretcher Engine', translations: { en: 'Stretcher Engine', 'zh-CN': 'Stretcher Engine' }, slug: 'guide/stretcher-engine' },
+            { label: 'Chunk Buffering', translations: { en: 'Chunk Buffering', 'zh-CN': 'Chunk Buffering' }, slug: 'guide/chunk-buffering' },
+            { label: 'Status Management', translations: { en: 'Status Management', 'zh-CN': 'Status Management' }, slug: 'guide/status-management' },
           ],
         },
         {
