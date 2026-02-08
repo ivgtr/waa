@@ -1,24 +1,12 @@
-import { useState, useMemo, useSyncExternalStore, useRef, useEffect, useCallback } from 'react';
-import { getSnapshot, subscribeSnapshot } from 'waa';
-import type { Playback, PlaybackSnapshot, PeakPair } from 'waa';
-import { getSharedPlayer, formatTime } from '../../demo/shared-player';
+import { useRef, useEffect } from 'react';
+import type { PeakPair } from 'waa';
+import { useReactPlayer } from '../../hooks/useReactPlayer';
+import { formatTime } from '../../demo/shared-player';
 import { t } from '../../i18n/translations';
 import type { Locale } from '../../i18n/translations';
 import '../../demo/style.css';
 
-function usePlaybackSnapshot(playback: Playback | null): PlaybackSnapshot | null {
-  const subscribe = useCallback(
-    (cb: () => void) => (playback ? subscribeSnapshot(playback, cb) : () => {}),
-    [playback],
-  );
-  const snap = useCallback(
-    () => (playback ? getSnapshot(playback) : null),
-    [playback],
-  );
-  return useSyncExternalStore(subscribe, snap, snap);
-}
-
-function Waveform({ peaks, progress }: { peaks: PeakPair[]; progress: number }) {
+function Waveform({ peaks, progress, onSeek }: { peaks: PeakPair[]; progress: number; onSeek?: (ratio: number) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -41,8 +29,15 @@ function Waveform({ peaks, progress }: { peaks: PeakPair[]; progress: number }) 
     }
   }, [peaks, progress]);
 
+  function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!onSeek) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    onSeek(ratio);
+  }
+
   return (
-    <div className="waveform-container">
+    <div className="waveform-container" onClick={handleClick} style={{ cursor: onSeek ? 'pointer' : undefined }}>
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
       <div className="waveform-cursor" style={{ left: `${progress * 100}%` }} />
     </div>
@@ -54,84 +49,26 @@ interface Props {
 }
 
 export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
-  const playerRef = useRef<ReturnType<typeof getSharedPlayer> | null>(null);
-  function getPlayer() {
-    if (!playerRef.current) playerRef.current = getSharedPlayer();
-    return playerRef.current;
-  }
-  const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
-  const [playback, setPlayback] = useState<Playback | null>(null);
-  const [synthType, setSynthType] = useState('sine');
-  const [synthFreq, setSynthFreq] = useState(440);
-  const [synthDur, setSynthDur] = useState(3);
-  const [fileName, setFileName] = useState('');
-  const [fileLoading, setFileLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const snap = usePlaybackSnapshot(playback);
-  const peaks = useMemo(
-    () => (buffer && playerRef.current ? playerRef.current.extractPeakPairs(buffer, { resolution: 200 }) : []),
-    [buffer],
-  );
-
-  async function handleGenerate() {
-    const p = getPlayer();
-    await p.ensureRunning();
-    if (playback && playback.getState() !== 'stopped') {
-      playback.stop();
-    }
-    setPlayback(null);
-    let buf: AudioBuffer;
-    switch (synthType) {
-      case 'noise': buf = p.createNoiseBuffer(synthDur); break;
-      case 'click': buf = p.createClickBuffer(synthFreq, synthDur); break;
-      default: buf = p.createSineBuffer(synthFreq, synthDur);
-    }
-    setBuffer(buf);
-  }
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFileLoading(true);
-    setFileName('');
-    try {
-      const p = getPlayer();
-      await p.ensureRunning();
-      if (playback && playback.getState() !== 'stopped') {
-        playback.stop();
-      }
-      setPlayback(null);
-      const buf = await p.loadFromBlob(file);
-      setBuffer(buf);
-      setFileName(file.name);
-    } catch {
-      setFileName(t(locale, 'source.load-failed'));
-    } finally {
-      setFileLoading(false);
-    }
-  }
-
-  function handleToggle() {
-    if (!buffer) return;
-    const p = getPlayer();
-    if (!playback || playback.getState() === 'stopped') {
-      if (playback) {
-        playback.dispose();
-      }
-      const pb = p.play(buffer, { loop: true });
-      setPlayback(pb);
-    } else {
-      playback.togglePlayPause();
-    }
-  }
-
-  function handleStop() {
-    if (playback) {
-      playback.stop();
-    }
-  }
-
-  const state = snap?.state ?? 'stopped';
+  const {
+    buffer,
+    snap,
+    peaks,
+    state,
+    synthType,
+    setSynthType,
+    synthFreq,
+    setSynthFreq,
+    synthDur,
+    setSynthDur,
+    fileName,
+    fileLoading,
+    fileInputRef,
+    handleGenerate,
+    handleFileChange,
+    handleToggle,
+    handleStop,
+    handleSeek,
+  } = useReactPlayer(locale);
 
   return (
     <div className="demo-wrapper not-content">
@@ -181,7 +118,7 @@ export default function ReactPlayerDemo({ locale = 'ja' }: Props) {
         <>
           <section className="card">
             <h2>{t(locale, 'waveform.title')}</h2>
-            <Waveform peaks={peaks} progress={snap?.progress ?? 0} />
+            <Waveform peaks={peaks} progress={snap?.progress ?? 0} onSeek={handleSeek} />
             <div className="time-display">
               <span>{formatTime(snap?.position ?? 0)}</span>
               <span>{formatTime(snap?.duration ?? 0)}</span>
