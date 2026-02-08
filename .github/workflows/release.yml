@@ -47,7 +47,7 @@ jobs:
         if: steps.check-label.outputs.release-type != 'none'
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Get latest version from tags
@@ -102,8 +102,6 @@ jobs:
       - name: Publish to npm
         if: steps.check-label.outputs.release-type != 'none'
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Commit version bump and push tag
         if: steps.check-label.outputs.release-type != 'none'
