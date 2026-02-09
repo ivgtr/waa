@@ -56,7 +56,7 @@ export function play(
   let sourceNode: AudioBufferSourceNode | null = null;
   let startedAt = 0; // ctx.currentTime when playback last started/resumed
   let pausedAt = initialOffset; // position in the buffer (seconds)
-  let currentRate = initialRate;
+  let currentRate = initialRate > 0 ? initialRate : 1;
   let isLooping = loop;
   let timerId: ReturnType<typeof setInterval> | null = null;
   let disposed = false;
@@ -148,8 +148,8 @@ export function play(
     if (state === "playing") {
       const elapsed = (ctx.currentTime - startedAt) * currentRate;
       if (isLooping) {
-        const loopDur =
-          (loopEnd ?? duration) - (loopStart ?? 0);
+        const loopDur = (loopEnd ?? duration) - (loopStart ?? 0);
+        if (loopDur <= 0) return Math.min(elapsed, duration);
         return ((elapsed - (loopStart ?? 0)) % loopDur) + (loopStart ?? 0);
       }
       return Math.min(elapsed, duration);
@@ -208,6 +208,7 @@ export function play(
   }
 
   function setPlaybackRate(rate: number) {
+    if (rate <= 0) return;
     const position = getCurrentTime();
     currentRate = rate;
     if (sourceNode) {
@@ -282,7 +283,7 @@ function createStretchedPlayback(
     null;
   let timerId: ReturnType<typeof setInterval> | null = null;
   let disposed = false;
-  let currentRate = initialRate;
+  let currentRate = initialRate > 0 ? initialRate : 1;
   let isLooping = loop;
   let pendingSeek: number | null = null;
 
@@ -321,17 +322,16 @@ function createStretchedPlayback(
 
     engineInstance.on("ended", () => {
       if (disposed) return;
-      state = "stopped";
+      if (state === "stopped") return;
       stopTimer();
-      emitter.emit("statechange", { state: "stopped" });
+      setState("stopped");
       emitter.emit("ended", undefined as never);
     });
 
     engineInstance.on("error", (data) => {
       if (disposed) return;
       if (data.fatal) {
-        state = "stopped";
-        emitter.emit("statechange", { state: "stopped" });
+        setState("stopped");
         emitter.emit("ended", undefined as never);
       }
     });
@@ -354,11 +354,16 @@ function createStretchedPlayback(
     }
   }).catch(() => {
     if (disposed) return;
-    state = "stopped";
     stopTimer();
-    emitter.emit("statechange", { state: "stopped" });
+    setState("stopped");
     emitter.emit("ended", undefined as never);
   });
+
+  function setState(next: PlaybackState) {
+    if (state === next) return;
+    state = next;
+    emitter.emit("statechange", { state: next });
+  }
 
   function startTimer() {
     if (timerId !== null) return;
@@ -390,19 +395,17 @@ function createStretchedPlayback(
 
   function pause() {
     if (state !== "playing" || disposed) return;
-    state = "paused";
     engineInstance?.pause();
     stopTimer();
-    emitter.emit("statechange", { state: "paused" });
+    setState("paused");
     emitter.emit("pause", undefined as never);
   }
 
   function resume() {
     if (state !== "paused" || disposed) return;
-    state = "playing";
     engineInstance?.resume();
     startTimer();
-    emitter.emit("statechange", { state: "playing" });
+    setState("playing");
     emitter.emit("resume", undefined as never);
   }
 
@@ -424,14 +427,14 @@ function createStretchedPlayback(
 
   function stop() {
     if (state === "stopped" || disposed) return;
-    state = "stopped";
     engineInstance?.stop();
     stopTimer();
-    emitter.emit("statechange", { state: "stopped" });
+    setState("stopped");
     emitter.emit("stop", undefined as never);
   }
 
   function setPlaybackRate(rate: number) {
+    if (rate <= 0) return;
     currentRate = rate;
     if (engineInstance) {
       engineInstance.setTempo(rate);

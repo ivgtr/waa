@@ -426,13 +426,11 @@ describe("play() – stretched playback (preservePitch: true)", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Potential bug: stop()→catch() statechange double-fire
-  // play.ts L324,425: engine "ended" emits statechange+ended,
-  //                    but stop() already emits statechange+stop
+  // stop() then engine ended does not double-fire statechange
   // -----------------------------------------------------------------------
 
   describe("stop + ended race condition", () => {
-    it("stop() emits statechange once", async () => {
+    it("stop() then engine ended does not double-fire statechange", async () => {
       const stateHandler = vi.fn();
       const pb = play(ctx, buffer, { preservePitch: true });
       pb.on("statechange", stateHandler);
@@ -440,21 +438,12 @@ describe("play() – stretched playback (preservePitch: true)", () => {
       await flushImport();
 
       pb.stop();
-      // stop() should emit statechange { state: "stopped" }
       expect(stateHandler).toHaveBeenCalledTimes(1);
       expect(stateHandler).toHaveBeenCalledWith({ state: "stopped" });
 
-      // If engine also fires ended after stop, the disposed check should prevent double-fire
-      // BUT: we're not disposed yet, just stopped. Let's see if ended fires again.
+      // Engine fires ended after stop — setState guard prevents double-fire
       emitEngineEvent("ended");
-      // state is already "stopped", so the ended handler checks state !== "playing" implicitly
-      // However, the code does `state = "stopped"` unconditionally in ended handler
-      // Then emits statechange again. This could be a double-fire.
-      // Count: stateHandler should ideally be called only once from stop()
-      // but the ended handler will fire another statechange if state wasn't already "stopped"
-      // Since state IS already "stopped", setState("stopped") would be skipped
-      // BUT the ended handler doesn't use setState, it does direct assignment + emit
-      expect(stateHandler).toHaveBeenCalledTimes(2); // BUG: double statechange
+      expect(stateHandler).toHaveBeenCalledTimes(1);
       pb.dispose();
     });
   });

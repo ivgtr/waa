@@ -113,7 +113,7 @@ describe("createStretchedPlayback — dynamic import .catch()", () => {
     expect(endedHandler).not.toHaveBeenCalled();
   });
 
-  it("catch 発火前に stop() → catch でも stopped イベントが emit される", async () => {
+  it("catch 発火前に stop() → catch では statechange が二重発火しない", async () => {
     const pb = play(ctx, buffer);
 
     const statechangeHandler = vi.fn();
@@ -127,9 +127,9 @@ describe("createStretchedPlayback — dynamic import .catch()", () => {
 
     await vi.advanceTimersByTimeAsync(0);
 
-    // stop() sets state="stopped" but does NOT set disposed=true,
-    // so catch handler still executes
-    expect(statechangeHandler).toHaveBeenCalledWith({ state: "stopped" });
+    // stop() already set state="stopped", so setState guard prevents double-fire
+    expect(statechangeHandler).not.toHaveBeenCalled();
+    // ended is still emitted from catch handler
     expect(endedHandler).toHaveBeenCalledTimes(1);
   });
 

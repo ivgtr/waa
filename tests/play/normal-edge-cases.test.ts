@@ -21,12 +21,11 @@ describe("play() – normal edge cases (preservePitch: false)", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Potential bug: loopEnd <= loopStart → zero division in getCurrentTime
-  // play.ts L151: % loopDur where loopDur = loopEnd - loopStart
+  // loopEnd <= loopStart → loopDur guard falls back to non-loop behavior
   // -----------------------------------------------------------------------
 
-  describe("loopEnd <= loopStart (zero division risk)", () => {
-    it("loopEnd === loopStart yields loopDur === 0", () => {
+  describe("loopEnd <= loopStart (loopDur guard)", () => {
+    it("loopEnd === loopStart falls back to non-loop position", () => {
       const pb = play(ctx, buffer, {
         preservePitch: false,
         loop: true,
@@ -34,14 +33,13 @@ describe("play() – normal edge cases (preservePitch: false)", () => {
         loopEnd: 5,
       });
       ctx._setCurrentTime(6);
-      // loopDur = 5 - 5 = 0, so (elapsed - loopStart) % 0 → NaN
       const pos = pb.getCurrentTime();
-      // This will likely be NaN – documenting the bug
-      expect(pos).toBeNaN();
+      // loopDur = 0 → guard returns Math.min(elapsed, duration) = 6
+      expect(pos).toBe(6);
       pb.dispose();
     });
 
-    it("loopEnd < loopStart yields negative loopDur", () => {
+    it("loopEnd < loopStart falls back to non-loop position", () => {
       const pb = play(ctx, buffer, {
         preservePitch: false,
         loop: true,
@@ -49,47 +47,37 @@ describe("play() – normal edge cases (preservePitch: false)", () => {
         loopEnd: 3,
       });
       ctx._setCurrentTime(5);
-      // loopDur = 3 - 8 = -5, so % -5 in JS returns negative remainder
       const pos = pb.getCurrentTime();
-      // Documenting: negative modulo produces unexpected result
-      // pos = ((5 - 8) % -5) + 8 = (-3 % -5) + 8 = -3 + 8 = 5
-      // Technically not a crash, but semantically wrong
-      expect(typeof pos).toBe("number");
+      // loopDur = -5 → guard returns Math.min(elapsed, duration) = 5
+      expect(pos).toBe(5);
       pb.dispose();
     });
   });
 
   // -----------------------------------------------------------------------
-  // Potential bug: playbackRate = 0 → zero division in getCurrentTime / setPlaybackRate
-  // play.ts L92: ctx.currentTime - positionInBuffer / currentRate
-  // play.ts L215: startedAt = ctx.currentTime - position / rate
+  // playbackRate = 0 → clamped to 1 / ignored by setPlaybackRate
   // -----------------------------------------------------------------------
 
-  describe("playbackRate = 0 (zero division risk)", () => {
-    it("getCurrentTime returns Infinity when rate is 0", () => {
+  describe("playbackRate = 0 (validation guard)", () => {
+    it("playbackRate: 0 is clamped to 1", () => {
       const pb = play(ctx, buffer, {
         preservePitch: false,
         playbackRate: 0,
       });
       ctx._setCurrentTime(5);
-      // elapsed = (5 - startedAt) * 0 = 0
-      // Actually rate=0: startedAt = ctx.currentTime - 0 / 0 = NaN
       const pos = pb.getCurrentTime();
-      // startSource: startedAt = 0 - 0/0 = NaN
-      // elapsed = (5 - NaN) * 0 = NaN
-      expect(pos).toBeNaN();
+      // rate clamped to 1, elapsed = (5 - 0) * 1 = 5
+      expect(pos).toBe(5);
       pb.dispose();
     });
 
-    it("setPlaybackRate(0) from a valid rate", () => {
+    it("setPlaybackRate(0) is ignored", () => {
       const pb = play(ctx, buffer, { preservePitch: false });
       ctx._setCurrentTime(4);
       pb.setPlaybackRate(0);
-      // position = getCurrentTime() = (4 - 0) * 1 = 4
-      // startedAt = 4 - 4 / 0 = 4 - Infinity = -Infinity
       const pos = pb.getCurrentTime();
-      // elapsed = (4 - (-Infinity)) * 0 = Infinity * 0 = NaN
-      expect(pos).toBeNaN();
+      // setPlaybackRate(0) is a no-op, rate stays 1, position = 4
+      expect(pos).toBe(4);
       pb.dispose();
     });
   });
