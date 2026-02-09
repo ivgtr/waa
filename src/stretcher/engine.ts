@@ -11,6 +11,7 @@ import { createConversionScheduler } from "./conversion-scheduler.js";
 import { createChunkPlayer } from "./chunk-player.js";
 import { createBufferMonitor } from "./buffer-monitor.js";
 import { createConversionEstimator } from "./conversion-estimator.js";
+import { calcPositionInOriginalBuffer } from "./position-calc.js";
 import type {
   ChunkInfo,
   StretcherEngine,
@@ -26,7 +27,7 @@ import type {
 /**
  * Trim overlap regions from WSOLA output so adjacent chunks don't double-play.
  */
-function trimOverlap(
+export function trimOverlap(
   outputData: Float32Array[],
   outputLength: number,
   chunk: ChunkInfo,
@@ -436,31 +437,20 @@ export function createStretcherEngine(
   }
 
   function getPositionInOriginalBuffer(): number {
-    if (phase === "ended") return totalDuration;
-    if (phase === "waiting") return offset;
-    if (phase === "buffering" && bufferingResumePosition !== null) {
-      return bufferingResumePosition;
-    }
-
-    const chunk = chunks[currentChunkIndex];
-    if (!chunk) return 0;
-
-    // Nominal start time of this chunk in the original buffer
-    const nominalStartSample = chunk.inputStartSample + chunk.overlapBefore;
-    const nominalStartSec = nominalStartSample / sampleRate;
-
-    // Position within the current chunk (in output time)
-    const posInChunk = chunkPlayer.getCurrentPosition();
-
-    // Subtract the crossfade overlap kept at the start of non-first chunks
-    const crossfadeOffset = chunk.overlapBefore > 0 ? CROSSFADE_SEC : 0;
-    const adjustedPosInChunk = Math.max(0, posInChunk - crossfadeOffset);
-
-    // Convert output position back to original buffer time
-    // output duration = input duration / tempo
-    const posInOriginal = adjustedPosInChunk * currentTempo;
-
-    return Math.min(nominalStartSec + posInOriginal, totalDuration);
+    const chunk = chunks[currentChunkIndex] ?? null;
+    return calcPositionInOriginalBuffer({
+      phase,
+      totalDuration,
+      offset,
+      bufferingResumePosition,
+      currentTempo,
+      sampleRate,
+      crossfadeSec: CROSSFADE_SEC,
+      chunk: chunk
+        ? { inputStartSample: chunk.inputStartSample, overlapBefore: chunk.overlapBefore }
+        : null,
+      posInChunk: chunkPlayer.getCurrentPosition(),
+    });
   }
 
   function getStatus(): StretcherStatus {

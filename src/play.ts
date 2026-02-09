@@ -3,10 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import { createEmitter } from "./emitter.js";
+import { calcPlaybackPosition } from "./playback-position.js";
+import { createPlaybackStateManager } from "./playback-state.js";
 import type {
   Playback,
   PlaybackEventMap,
-  PlaybackState,
   PlayOptions,
   StretcherSnapshotExtension,
 } from "./types.js";
@@ -52,14 +53,23 @@ export function play(
   const duration = buffer.duration;
 
   // ----- mutable internal state -----
-  let state: PlaybackState = "stopped";
   let sourceNode: AudioBufferSourceNode | null = null;
   let startedAt = 0; // ctx.currentTime when playback last started/resumed
   let pausedAt = initialOffset; // position in the buffer (seconds)
   let currentRate = initialRate > 0 ? initialRate : 1;
   let isLooping = loop;
-  let timerId: ReturnType<typeof setInterval> | null = null;
-  let disposed = false;
+
+  const sm = createPlaybackStateManager({
+    initialState: "stopped",
+    onStateChange: (next) => emitter.emit("statechange", { state: next }),
+    onTimerTick: () => {
+      emitter.emit("timeupdate", {
+        position: getCurrentTime(),
+        duration,
+      });
+    },
+    timerInterval: timeupdateInterval,
+  });
 
   // ----- helpers -----
 
@@ -107,103 +117,82 @@ export function play(
 
   function handleEnded() {
     // If we manually stopped / paused, the handler was already removed.
-    if (state !== "playing") return;
+    if (sm.getState() !== "playing") return;
     if (isLooping) {
       emitter.emit("loop", undefined as never);
       return;
     }
-    setState("stopped");
+    sm.setState("stopped");
     pausedAt = 0;
-    stopTimer();
+    sm.stopTimer();
     emitter.emit("ended", undefined as never);
-  }
-
-  function setState(next: PlaybackState) {
-    if (state === next) return;
-    state = next;
-    emitter.emit("statechange", { state: next });
-  }
-
-  function startTimer() {
-    if (timerId !== null) return;
-    timerId = setInterval(() => {
-      if (state !== "playing") return;
-      emitter.emit("timeupdate", {
-        position: getCurrentTime(),
-        duration,
-      });
-    }, timeupdateInterval);
-  }
-
-  function stopTimer() {
-    if (timerId !== null) {
-      clearInterval(timerId);
-      timerId = null;
-    }
   }
 
   // ----- public API -----
 
   function getCurrentTime(): number {
-    if (state === "playing") {
-      const elapsed = (ctx.currentTime - startedAt) * currentRate;
-      if (isLooping) {
-        const loopDur = (loopEnd ?? duration) - (loopStart ?? 0);
-        if (loopDur <= 0) return Math.min(elapsed, duration);
-        return ((elapsed - (loopStart ?? 0)) % loopDur) + (loopStart ?? 0);
-      }
-      return Math.min(elapsed, duration);
-    }
-    if (state === "paused") return pausedAt;
-    return 0;
+    const state = sm.getState();
+    const elapsed =
+      state === "playing"
+        ? (ctx.currentTime - startedAt) * currentRate
+        : 0;
+    return calcPlaybackPosition(
+      state,
+      elapsed,
+      duration,
+      pausedAt,
+      isLooping,
+      loopStart,
+      loopEnd,
+    );
   }
 
   function pause() {
-    if (state !== "playing" || disposed) return;
+    if (sm.getState() !== "playing" || sm.isDisposed()) return;
     pausedAt = getCurrentTime();
     stopSource();
-    stopTimer();
-    setState("paused");
+    sm.stopTimer();
+    sm.setState("paused");
     emitter.emit("pause", undefined as never);
   }
 
   function resume() {
-    if (state !== "paused" || disposed) return;
+    if (sm.getState() !== "paused" || sm.isDisposed()) return;
     startSource(pausedAt);
-    setState("playing");
-    startTimer();
+    sm.setState("playing");
+    sm.startTimer();
     emitter.emit("resume", undefined as never);
   }
 
   function togglePlayPause() {
-    if (state === "playing") pause();
-    else if (state === "paused") resume();
+    if (sm.getState() === "playing") pause();
+    else if (sm.getState() === "paused") resume();
   }
 
   function seek(position: number) {
-    if (disposed) return;
+    if (sm.isDisposed()) return;
     const clamped = Math.max(0, Math.min(position, duration));
-    const wasPlaying = state === "playing";
+    const wasPlaying = sm.getState() === "playing";
 
     stopSource();
-    stopTimer();
+    sm.stopTimer();
 
     pausedAt = clamped;
 
     if (wasPlaying) {
       startSource(clamped);
-      startTimer();
+      sm.startTimer();
     }
 
     emitter.emit("seek", { position: clamped });
   }
 
   function stop() {
-    if (state === "stopped" || disposed) return;
+    if (sm.getState() === "stopped" || sm.isDisposed()) return;
     stopSource();
-    stopTimer();
+    sm.stopTimer();
     pausedAt = 0;
-    setState("stopped");
+    sm.setState("stopped");
     emitter.emit("stop", undefined as never);
   }
 
@@ -225,22 +214,21 @@ export function play(
   }
 
   function dispose() {
-    if (disposed) return;
-    disposed = true;
+    if (sm.isDisposed()) return;
+    sm.markDisposed();
     stopSource();
-    stopTimer();
     emitter.clear();
   }
 
   // ----- kick off initial playback -----
 
   startSource(initialOffset);
-  setState("playing");
-  startTimer();
+  sm.setState("playing");
+  sm.startTimer();
   emitter.emit("play", undefined as never);
 
   return {
-    getState: () => state,
+    getState: () => sm.getState(),
     getCurrentTime,
     getDuration: () => duration,
     getProgress: () => (duration > 0 ? getCurrentTime() / duration : 0),
@@ -278,14 +266,23 @@ function createStretchedPlayback(
   const emitter = createEmitter<PlaybackEventMap>();
   const duration = buffer.duration;
 
-  let state: PlaybackState = "playing";
   let engineInstance: import("./stretcher/types.js").StretcherEngine | null =
     null;
-  let timerId: ReturnType<typeof setInterval> | null = null;
-  let disposed = false;
   let currentRate = initialRate > 0 ? initialRate : 1;
   let isLooping = loop;
   let pendingSeek: number | null = null;
+
+  const sm = createPlaybackStateManager({
+    initialState: "playing",
+    onStateChange: (next) => emitter.emit("statechange", { state: next }),
+    onTimerTick: () => {
+      emitter.emit("timeupdate", {
+        position: getCurrentTime(),
+        duration,
+      });
+    },
+    timerInterval: timeupdateInterval,
+  });
 
   // Emit initial play event
   emitter.emit("statechange", { state: "playing" });
@@ -293,7 +290,7 @@ function createStretchedPlayback(
 
   // Fire-and-forget dynamic import of the stretcher engine
   import("./stretcher/engine.js").then(({ createStretcherEngine }) => {
-    if (disposed) return;
+    if (sm.isDisposed()) return;
 
     engineInstance = createStretcherEngine(ctx, buffer, {
       tempo: currentRate,
@@ -306,39 +303,39 @@ function createStretchedPlayback(
 
     // Wire stretcher events to playback events
     engineInstance.on("buffering", (data) => {
-      if (disposed) return;
+      if (sm.isDisposed()) return;
       emitter.emit("buffering", data);
     });
 
     engineInstance.on("buffered", (data) => {
-      if (disposed) return;
+      if (sm.isDisposed()) return;
       emitter.emit("buffered", data);
     });
 
     engineInstance.on("loop", () => {
-      if (disposed) return;
+      if (sm.isDisposed()) return;
       emitter.emit("loop", undefined as never);
     });
 
     engineInstance.on("ended", () => {
-      if (disposed) return;
-      if (state === "stopped") return;
-      stopTimer();
-      setState("stopped");
+      if (sm.isDisposed()) return;
+      if (sm.getState() === "stopped") return;
+      sm.stopTimer();
+      sm.setState("stopped");
       emitter.emit("ended", undefined as never);
     });
 
     engineInstance.on("error", (data) => {
-      if (disposed) return;
+      if (sm.isDisposed()) return;
       if (data.fatal) {
-        setState("stopped");
+        sm.setState("stopped");
         emitter.emit("ended", undefined as never);
       }
     });
 
     // Start engine and timeupdate timer
     engineInstance.start();
-    startTimer();
+    sm.startTimer();
 
     // Apply pending seek if any
     if (pendingSeek !== null) {
@@ -347,41 +344,17 @@ function createStretchedPlayback(
     }
 
     // If we were paused before the engine loaded, pause it
-    if (state === "paused") {
+    if (sm.getState() === "paused") {
       engineInstance.pause();
-    } else if (state === "stopped") {
+    } else if (sm.getState() === "stopped") {
       engineInstance.stop();
     }
   }).catch(() => {
-    if (disposed) return;
-    stopTimer();
-    setState("stopped");
+    if (sm.isDisposed()) return;
+    sm.stopTimer();
+    sm.setState("stopped");
     emitter.emit("ended", undefined as never);
   });
-
-  function setState(next: PlaybackState) {
-    if (state === next) return;
-    state = next;
-    emitter.emit("statechange", { state: next });
-  }
-
-  function startTimer() {
-    if (timerId !== null) return;
-    timerId = setInterval(() => {
-      if (state !== "playing" || disposed) return;
-      emitter.emit("timeupdate", {
-        position: getCurrentTime(),
-        duration,
-      });
-    }, timeupdateInterval);
-  }
-
-  function stopTimer() {
-    if (timerId !== null) {
-      clearInterval(timerId);
-      timerId = null;
-    }
-  }
 
   function getCurrentTime(): number {
     if (pendingSeek !== null) {
@@ -394,28 +367,28 @@ function createStretchedPlayback(
   }
 
   function pause() {
-    if (state !== "playing" || disposed) return;
+    if (sm.getState() !== "playing" || sm.isDisposed()) return;
     engineInstance?.pause();
-    stopTimer();
-    setState("paused");
+    sm.stopTimer();
+    sm.setState("paused");
     emitter.emit("pause", undefined as never);
   }
 
   function resume() {
-    if (state !== "paused" || disposed) return;
+    if (sm.getState() !== "paused" || sm.isDisposed()) return;
     engineInstance?.resume();
-    startTimer();
-    setState("playing");
+    sm.startTimer();
+    sm.setState("playing");
     emitter.emit("resume", undefined as never);
   }
 
   function togglePlayPause() {
-    if (state === "playing") pause();
-    else if (state === "paused") resume();
+    if (sm.getState() === "playing") pause();
+    else if (sm.getState() === "paused") resume();
   }
 
   function seek(position: number) {
-    if (disposed) return;
+    if (sm.isDisposed()) return;
     const clamped = Math.max(0, Math.min(position, duration));
     if (engineInstance) {
       engineInstance.seek(clamped);
@@ -426,10 +399,10 @@ function createStretchedPlayback(
   }
 
   function stop() {
-    if (state === "stopped" || disposed) return;
+    if (sm.getState() === "stopped" || sm.isDisposed()) return;
     engineInstance?.stop();
-    stopTimer();
-    setState("stopped");
+    sm.stopTimer();
+    sm.setState("stopped");
     emitter.emit("stop", undefined as never);
   }
 
@@ -447,9 +420,8 @@ function createStretchedPlayback(
   }
 
   function dispose() {
-    if (disposed) return;
-    disposed = true;
-    stopTimer();
+    if (sm.isDisposed()) return;
+    sm.markDisposed();
     engineInstance?.dispose();
     emitter.clear();
   }
@@ -462,7 +434,7 @@ function createStretchedPlayback(
   const playback: Playback & {
     _getStretcherSnapshot: typeof _getStretcherSnapshot;
   } = {
-    getState: () => state,
+    getState: () => sm.getState(),
     getCurrentTime,
     getDuration: () => duration,
     getProgress: () => (duration > 0 ? getCurrentTime() / duration : 0),

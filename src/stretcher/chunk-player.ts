@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { CROSSFADE_SEC, LOOKAHEAD_INTERVAL_MS, LOOKAHEAD_THRESHOLD_SEC } from "./constants.js";
+import { calcTransitionDelay } from "./transition-timing.js";
 import type { ChunkPlayer, ChunkPlayerOptions } from "./types.js";
 
 const CURVE_LENGTH = 256;
@@ -224,10 +225,7 @@ export function createChunkPlayer(
     }
 
     // After transition, promote next to current
-    const transitionDelay = Math.max(
-      0,
-      (startTime - ctx.currentTime) * 1000 + 50,
-    );
+    const transitionDelay = calcTransitionDelay(startTime, ctx.currentTime);
     cancelTransition();
     transitionTimerId = setTimeout(() => {
       transitionTimerId = null;
