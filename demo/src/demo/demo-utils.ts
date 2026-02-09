@@ -108,12 +108,12 @@ export function setupFileInputHandler(
     el.fileLabelText.textContent = i18n.loading;
     el.fileName.innerHTML = '<span class="spinner"></span>';
     try {
-      await player.ensureRunning();
       initNodes();
       const buffer = await player.loadFromBlob(file);
       el.fileName.textContent = file.name;
       onLoad(buffer);
-    } catch {
+    } catch (e) {
+      console.error('Failed to load audio file:', e);
       el.fileName.textContent = i18n.loadFailed;
     } finally {
       el.fileLabel.classList.remove('is-loading');
