@@ -39,6 +39,7 @@ export function createChunkPlayer(
   let playStartCtxTime = 0; // ctx.currentTime when playback started
   let playStartOffset = 0; // offset within the chunk at start
   let currentChunkDuration = 0;
+  let nextStartCtxTime = 0; // scheduleNext で次ソースの AudioContext 開始時刻
   let paused = false;
   let pausedPosition = 0;
   let stopped = true;
@@ -135,6 +136,34 @@ export function createChunkPlayer(
     }
   }
 
+  function doTransition(buffer: AudioBuffer, startCtxTime: number): void {
+    stopCurrentSource();
+    currentSource = nextSource;
+    currentGain = nextGain;
+    nextSource = null;
+    nextGain = null;
+
+    currentChunkDuration = buffer.duration;
+    playStartOffset = 0;
+    playStartCtxTime = startCtxTime;
+
+    if (currentSource) {
+      currentSource.onended = handleCurrentSourceEnded;
+    }
+
+    onTransition?.();
+  }
+
+  function handleCurrentSourceEnded(): void {
+    if (disposed || paused || stopped) return;
+    if (nextSource) {
+      cancelTransition();
+      doTransition(nextSource.buffer! as AudioBuffer, nextStartCtxTime);
+    } else {
+      onChunkEnded?.();
+    }
+  }
+
   function getElapsedInChunk(): number {
     if (paused) return pausedPosition;
     if (stopped) return 0;
@@ -158,11 +187,7 @@ export function createChunkPlayer(
     paused = false;
     stopped = false;
 
-    currentSource.onended = () => {
-      if (!disposed && !paused && !stopped) {
-        onChunkEnded?.();
-      }
-    };
+    currentSource.onended = handleCurrentSourceEnded;
 
     currentSource.start(0, offsetInChunk);
 
@@ -182,18 +207,15 @@ export function createChunkPlayer(
     nextGain = ctx.createGain();
     nextSource = createSourceFromBuffer(buffer, nextGain);
 
-    nextSource.onended = () => {
-      if (!disposed && !paused && !stopped) {
-        onChunkEnded?.();
-      }
-    };
+    nextSource.onended = handleCurrentSourceEnded;
 
-    nextSource.start(startTime - crossfadeSec);
+    nextStartCtxTime = startTime - crossfadeSec;
+    nextSource.start(nextStartCtxTime);
 
     // Equal-power crossfade: fade out current, fade in next
     if (crossfadeSec > 0 && currentGain) {
-      currentGain.gain.setValueCurveAtTime(fadeOutCurve, startTime - crossfadeSec, crossfadeSec);
-      nextGain.gain.setValueCurveAtTime(fadeInCurve, startTime - crossfadeSec, crossfadeSec);
+      currentGain.gain.setValueCurveAtTime(fadeOutCurve, nextStartCtxTime, crossfadeSec);
+      nextGain.gain.setValueCurveAtTime(fadeInCurve, nextStartCtxTime, crossfadeSec);
     }
 
     // After transition, promote next to current
@@ -204,18 +226,8 @@ export function createChunkPlayer(
     cancelTransition();
     transitionTimerId = setTimeout(() => {
       transitionTimerId = null;
-      if (disposed) return;
-      stopCurrentSource();
-      currentSource = nextSource;
-      currentGain = nextGain;
-      nextSource = null;
-      nextGain = null;
-
-      currentChunkDuration = buffer.duration;
-      playStartOffset = 0;
-      playStartCtxTime = startTime - crossfadeSec;
-
-      onTransition?.();
+      if (disposed || !nextSource) return;
+      doTransition(buffer, nextStartCtxTime);
     }, transitionDelay);
   }
 

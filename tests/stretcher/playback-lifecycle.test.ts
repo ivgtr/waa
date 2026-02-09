@@ -311,4 +311,45 @@ describe("playback lifecycle (chunk progression)", () => {
 
     engine.dispose();
   });
+
+  it("gapless パス: onended が transition より先に発火 → nextSource が即座に昇格", () => {
+    const ctx = createMockAudioContext();
+    const buffer = createMockAudioBuffer(24);
+    const engine = createStretcherEngine(ctx, buffer, { tempo: 1.0 });
+
+    engine.start();
+
+    simulateWorkerResult(0, 0, CHUNK0_RAW);
+    simulateWorkerResult(1, 1, CHUNK1_RAW);
+    simulateWorkerResult(0, 2, CHUNK2_RAW);
+
+    expect(engine.getStatus().phase).toBe("playing");
+
+    const createBufferMock = (ctx as any).createBuffer;
+
+    // Lookahead → scheduleNext(chunk 1)
+    (ctx as any).currentTime = 7.6;
+    vi.advanceTimersByTime(200);
+
+    const callsAfterSchedule = createBufferMock.mock.calls.length;
+
+    // transition timer 発火前に onended をトリガー
+    // （バックグラウンドタブで setTimeout が遅延するケースを模倣）
+    const src = findActiveSource();
+    expect(src).not.toBeNull();
+    src!.onended!();
+
+    // KEY ASSERTION: 新ソースが作成されていない（createBuffer の追加呼び出しなし）
+    // → gapless の nextSource がそのまま昇格された
+    expect(createBufferMock.mock.calls.length).toBe(callsAfterSchedule);
+
+    // 後続の transition timer が発火しても二重昇格しない
+    (ctx as any).currentTime = 8.0;
+    vi.advanceTimersByTime(500);
+    expect(createBufferMock.mock.calls.length).toBe(callsAfterSchedule);
+
+    expect(engine.getStatus().phase).toBe("playing");
+
+    engine.dispose();
+  });
 });
