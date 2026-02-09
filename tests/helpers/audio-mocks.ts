@@ -30,8 +30,11 @@ export interface MockGainNode {
     value: number;
     setValueAtTime: ReturnType<typeof vi.fn>;
     linearRampToValueAtTime: ReturnType<typeof vi.fn>;
+    exponentialRampToValueAtTime: ReturnType<typeof vi.fn>;
     setValueCurveAtTime: ReturnType<typeof vi.fn>;
+    cancelScheduledValues: ReturnType<typeof vi.fn>;
   };
+  context: { currentTime: number };
   connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
 }
@@ -40,9 +43,48 @@ export interface MockGainNode {
 // AudioContext mock
 // ---------------------------------------------------------------------------
 
+export interface MockAnalyserNode {
+  frequencyBinCount: number;
+  fftSize: number;
+  smoothingTimeConstant: number;
+  getFloatFrequencyData: ReturnType<typeof vi.fn>;
+  getByteFrequencyData: ReturnType<typeof vi.fn>;
+  connect: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+}
+
+export interface MockBiquadFilterNode {
+  type: BiquadFilterType;
+  frequency: { value: number };
+  Q: { value: number };
+  gain: { value: number };
+  connect: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+}
+
+export interface MockStereoPannerNode {
+  pan: { value: number };
+  connect: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+}
+
+export interface MockDynamicsCompressorNode {
+  threshold: { value: number };
+  knee: { value: number };
+  ratio: { value: number };
+  attack: { value: number };
+  release: { value: number };
+  connect: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+}
+
 export interface MockAudioContext extends AudioContext {
   _sources: MockAudioBufferSourceNode[];
   _gains: MockGainNode[];
+  _analysers: MockAnalyserNode[];
+  _filters: MockBiquadFilterNode[];
+  _panners: MockStereoPannerNode[];
+  _compressors: MockDynamicsCompressorNode[];
   _setCurrentTime: (t: number) => void;
 }
 
@@ -50,16 +92,31 @@ export function createMockAudioContext(
   overrides?: Partial<{ currentTime: number; sampleRate: number }>,
 ): MockAudioContext {
   let _currentTime = overrides?.currentTime ?? 0;
+  let _state: AudioContextState = "running";
   const _sampleRate = overrides?.sampleRate ?? 44100;
   const sources: MockAudioBufferSourceNode[] = [];
   const gains: MockGainNode[] = [];
+  const analysers: MockAnalyserNode[] = [];
+  const filters: MockBiquadFilterNode[] = [];
+  const panners: MockStereoPannerNode[] = [];
+  const compressors: MockDynamicsCompressorNode[] = [];
 
   const ctx = {
     get currentTime() {
       return _currentTime;
     },
+    get state() {
+      return _state;
+    },
     sampleRate: _sampleRate,
     destination: {} as AudioDestinationNode,
+
+    resume: vi.fn(async () => {
+      _state = "running";
+    }),
+    close: vi.fn(async () => {
+      _state = "closed";
+    }),
 
     createBufferSource: vi.fn(() => {
       const src: MockAudioBufferSourceNode = {
@@ -84,13 +141,72 @@ export function createMockAudioContext(
           value: 1,
           setValueAtTime: vi.fn(),
           linearRampToValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
           setValueCurveAtTime: vi.fn(),
+          cancelScheduledValues: vi.fn(),
         },
+        context: { get currentTime() { return _currentTime; } },
         connect: vi.fn(),
         disconnect: vi.fn(),
       };
       gains.push(gain);
       return gain;
+    }),
+
+    createAnalyser: vi.fn(() => {
+      const analyser: MockAnalyserNode = {
+        frequencyBinCount: 1024,
+        fftSize: 2048,
+        smoothingTimeConstant: 0.8,
+        getFloatFrequencyData: vi.fn(),
+        getByteFrequencyData: vi.fn(),
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      };
+      analysers.push(analyser);
+      return analyser;
+    }),
+
+    createBiquadFilter: vi.fn(() => {
+      const filter: MockBiquadFilterNode = {
+        type: "lowpass",
+        frequency: { value: 350 },
+        Q: { value: 1 },
+        gain: { value: 0 },
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      };
+      filters.push(filter);
+      return filter;
+    }),
+
+    createStereoPanner: vi.fn(() => {
+      const panner: MockStereoPannerNode = {
+        pan: { value: 0 },
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      };
+      panners.push(panner);
+      return panner;
+    }),
+
+    createDynamicsCompressor: vi.fn(() => {
+      const comp: MockDynamicsCompressorNode = {
+        threshold: { value: -24 },
+        knee: { value: 30 },
+        ratio: { value: 12 },
+        attack: { value: 0.003 },
+        release: { value: 0.25 },
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      };
+      compressors.push(comp);
+      return comp;
+    }),
+
+    decodeAudioData: vi.fn(async (arrayBuffer: ArrayBuffer) => {
+      const length = arrayBuffer.byteLength / 4 || 44100;
+      return createMockAudioBuffer(length / _sampleRate, _sampleRate);
     }),
 
     createBuffer: vi.fn(
@@ -111,8 +227,15 @@ export function createMockAudioContext(
 
     _sources: sources,
     _gains: gains,
+    _analysers: analysers,
+    _filters: filters,
+    _panners: panners,
+    _compressors: compressors,
     _setCurrentTime(t: number) {
       _currentTime = t;
+    },
+    _setState(s: AudioContextState) {
+      _state = s;
     },
   } as unknown as MockAudioContext;
 
@@ -257,6 +380,70 @@ export function stubWorkerGlobals(): {
     simulateWorkerError,
     simulateWorkerCrash,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Mock Playback for adapters tests
+// ---------------------------------------------------------------------------
+
+export interface MockPlayback {
+  getState: ReturnType<typeof vi.fn>;
+  getCurrentTime: ReturnType<typeof vi.fn>;
+  getDuration: ReturnType<typeof vi.fn>;
+  getProgress: ReturnType<typeof vi.fn>;
+  pause: ReturnType<typeof vi.fn>;
+  resume: ReturnType<typeof vi.fn>;
+  togglePlayPause: ReturnType<typeof vi.fn>;
+  seek: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+  setPlaybackRate: ReturnType<typeof vi.fn>;
+  setLoop: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
+  off: ReturnType<typeof vi.fn>;
+  dispose: ReturnType<typeof vi.fn>;
+  _emit: (event: string, data?: unknown) => void;
+}
+
+export function createMockPlayback(overrides?: {
+  state?: string;
+  currentTime?: number;
+  duration?: number;
+  progress?: number;
+}): MockPlayback {
+  const handlers = new Map<string, Set<(data: unknown) => void>>();
+
+  const playback: MockPlayback = {
+    getState: vi.fn(() => overrides?.state ?? "playing"),
+    getCurrentTime: vi.fn(() => overrides?.currentTime ?? 0),
+    getDuration: vi.fn(() => overrides?.duration ?? 10),
+    getProgress: vi.fn(() => overrides?.progress ?? 0),
+    pause: vi.fn(),
+    resume: vi.fn(),
+    togglePlayPause: vi.fn(),
+    seek: vi.fn(),
+    stop: vi.fn(),
+    setPlaybackRate: vi.fn(),
+    setLoop: vi.fn(),
+    on: vi.fn((event: string, handler: (data: unknown) => void) => {
+      if (!handlers.has(event)) handlers.set(event, new Set());
+      handlers.get(event)!.add(handler);
+      return () => {
+        handlers.get(event)?.delete(handler);
+      };
+    }),
+    off: vi.fn((event: string, handler: (data: unknown) => void) => {
+      handlers.get(event)?.delete(handler);
+    }),
+    dispose: vi.fn(),
+    _emit(event: string, data?: unknown) {
+      const set = handlers.get(event);
+      if (set) {
+        for (const h of set) h(data);
+      }
+    },
+  };
+
+  return playback;
 }
 
 // ---------------------------------------------------------------------------

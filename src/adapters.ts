@@ -152,6 +152,9 @@ export function whenPosition(
   playback: Playback,
   position: number,
 ): Promise<void> {
+  if (playback.getCurrentTime() >= position) {
+    return Promise.resolve();
+  }
   return new Promise<void>((resolve) => {
     const unsub = playback.on("timeupdate", ({ position: current }) => {
       if (current >= position) {
