@@ -352,6 +352,12 @@ function createStretchedPlayback(
     } else if (state === "stopped") {
       engineInstance.stop();
     }
+  }).catch(() => {
+    if (disposed) return;
+    state = "stopped";
+    stopTimer();
+    emitter.emit("statechange", { state: "stopped" });
+    emitter.emit("ended", undefined as never);
   });
 
   function startTimer() {

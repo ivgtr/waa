@@ -157,8 +157,13 @@ export function createChunkPlayer(
   function handleCurrentSourceEnded(): void {
     if (disposed || paused || stopped) return;
     if (nextSource) {
+      const buf = nextSource.buffer;
+      if (!buf) {
+        onChunkEnded?.();
+        return;
+      }
       cancelTransition();
-      doTransition(nextSource.buffer! as AudioBuffer, nextStartCtxTime);
+      doTransition(buf, nextStartCtxTime);
     } else {
       onChunkEnded?.();
     }
