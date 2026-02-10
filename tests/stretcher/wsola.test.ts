@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { WSOLA_FRAME_SIZE, WSOLA_HOP_SIZE } from "../../src/stretcher/constants";
 import { createHannWindow, findBestOffset, wsolaTimeStretch } from "../../src/stretcher/wsola";
 
 describe("createHannWindow", () => {
@@ -153,5 +154,167 @@ describe("wsolaTimeStretch", () => {
     // Should return a copy when too short
     expect(result.output).toHaveLength(1);
     expect(result.length).toBe(input.length);
+  });
+
+  it("produces uniform boundary discontinuity with compound wave (continuity)", () => {
+    const sampleRate = 44100;
+    const duration = 2.0;
+    const length = Math.round(sampleRate * duration);
+    const input = new Float32Array(length);
+    for (let i = 0; i < length; i++) {
+      input[i] =
+        0.6 * Math.sin((2 * Math.PI * 440 * i) / sampleRate) +
+        0.4 * Math.sin((2 * Math.PI * 1100 * i) / sampleRate);
+    }
+
+    const result = wsolaTimeStretch([input], 1.3, sampleRate);
+    const out = result.output[0]!;
+    const synthesisHop = WSOLA_HOP_SIZE;
+
+    const boundaryDiffs: number[] = [];
+    const nonBoundaryDiffs: number[] = [];
+
+    const startFrame = 2;
+    const endSample = result.length - WSOLA_FRAME_SIZE;
+    for (let i = startFrame * synthesisHop; i < endSample; i++) {
+      const diff = Math.abs(out[i]! - out[i - 1]!);
+      if (i % synthesisHop === 0) {
+        boundaryDiffs.push(diff);
+      } else {
+        nonBoundaryDiffs.push(diff);
+      }
+    }
+
+    const avgBoundary = boundaryDiffs.reduce((a, b) => a + b, 0) / boundaryDiffs.length;
+    const avgNonBoundary = nonBoundaryDiffs.reduce((a, b) => a + b, 0) / nonBoundaryDiffs.length;
+    const ratio = avgBoundary / avgNonBoundary;
+
+    // With windowed prevOutputFrame, boundary/non-boundary ratio should be
+    // very close to 1.0 (uniform discontinuity distribution).
+    // Raw prevFrame: ~0.988, windowed prevFrame: ~0.9996
+    expect(Math.abs(ratio - 1.0)).toBeLessThan(0.005);
+  });
+
+  describe("tempo≈1.0 identity bypass", () => {
+    it("returns exact copy at tempo=1.0", () => {
+      const sampleRate = 44100;
+      const input = createSineWave(440, sampleRate, 1.0);
+      const result = wsolaTimeStretch([input], 1.0, sampleRate);
+
+      expect(result.length).toBe(input.length);
+      // MSE should be exactly 0
+      let mse = 0;
+      for (let i = 0; i < input.length; i++) {
+        const diff = result.output[0]![i]! - input[i]!;
+        mse += diff * diff;
+      }
+      mse /= input.length;
+      expect(mse).toBe(0);
+    });
+
+    it("applies bypass within epsilon (tempo=0.9995)", () => {
+      const sampleRate = 44100;
+      const input = createSineWave(440, sampleRate, 1.0);
+      const result = wsolaTimeStretch([input], 0.9995, sampleRate);
+
+      expect(result.length).toBe(input.length);
+      let mse = 0;
+      for (let i = 0; i < input.length; i++) {
+        const diff = result.output[0]![i]! - input[i]!;
+        mse += diff * diff;
+      }
+      mse /= input.length;
+      expect(mse).toBe(0);
+    });
+
+    it("does NOT bypass outside epsilon (tempo=1.002)", () => {
+      const sampleRate = 44100;
+      const input = createSineWave(440, sampleRate, 1.0);
+      const result = wsolaTimeStretch([input], 1.002, sampleRate);
+
+      // Normal WSOLA should produce different length
+      expect(result.length).not.toBe(input.length);
+    });
+
+    it("handles multi-channel identity", () => {
+      const sampleRate = 44100;
+      const ch0 = createSineWave(440, sampleRate, 1.0);
+      const ch1 = createSineWave(880, sampleRate, 1.0);
+      const result = wsolaTimeStretch([ch0, ch1], 1.0, sampleRate);
+
+      expect(result.output).toHaveLength(2);
+      expect(result.length).toBe(ch0.length);
+
+      for (let i = 0; i < ch0.length; i++) {
+        expect(result.output[0]![i]).toBe(ch0[i]);
+        expect(result.output[1]![i]).toBe(ch1[i]);
+      }
+    });
+
+    it("returns independent copy (mutation does not affect input)", () => {
+      const sampleRate = 44100;
+      const input = createSineWave(440, sampleRate, 0.5);
+      const originalFirst = input[0]!;
+      const result = wsolaTimeStretch([input], 1.0, sampleRate);
+
+      // Mutate output
+      result.output[0]![0] = 999;
+      expect(input[0]).toBe(originalFirst);
+    });
+  });
+
+  it("produces uniform energy at frame boundaries (energy stability)", () => {
+    const sampleRate = 44100;
+    const input = createSineWave(440, sampleRate, 2.0);
+    const result = wsolaTimeStretch([input], 1.5, sampleRate);
+    const out = result.output[0]!;
+    const synthesisHop = WSOLA_HOP_SIZE;
+    const halfHop = Math.floor(synthesisHop / 2);
+
+    const windowSize = 64;
+    const halfWin = Math.floor(windowSize / 2);
+    const boundaryEnergies: number[] = [];
+    const nonBoundaryEnergies: number[] = [];
+
+    const startFrame = 2;
+    const endSample = result.length - WSOLA_FRAME_SIZE;
+
+    for (let frame = startFrame; frame * synthesisHop < endSample; frame++) {
+      const bCenter = frame * synthesisHop;
+      const nbCenter = bCenter + halfHop;
+
+      let bEnergy = 0;
+      let nbEnergy = 0;
+      for (let j = -halfWin; j < halfWin; j++) {
+        const bIdx = bCenter + j;
+        const nbIdx = nbCenter + j;
+        if (bIdx >= 0 && bIdx < result.length) {
+          bEnergy += out[bIdx]! * out[bIdx]!;
+        }
+        if (nbIdx >= 0 && nbIdx < result.length) {
+          nbEnergy += out[nbIdx]! * out[nbIdx]!;
+        }
+      }
+      boundaryEnergies.push(bEnergy);
+      nonBoundaryEnergies.push(nbEnergy);
+    }
+
+    const meanBE = boundaryEnergies.reduce((a, b) => a + b, 0) / boundaryEnergies.length;
+    const varBE =
+      boundaryEnergies.reduce((a, b) => a + (b - meanBE) ** 2, 0) / boundaryEnergies.length;
+    const cvBoundary = Math.sqrt(varBE) / meanBE;
+
+    const meanNBE = nonBoundaryEnergies.reduce((a, b) => a + b, 0) / nonBoundaryEnergies.length;
+    const varNBE =
+      nonBoundaryEnergies.reduce((a, b) => a + (b - meanNBE) ** 2, 0) /
+      nonBoundaryEnergies.length;
+    const cvNonBoundary = Math.sqrt(varNBE) / meanNBE;
+
+    const ratio = cvBoundary / cvNonBoundary;
+
+    // With windowed prevOutputFrame, boundary/non-boundary energy CV ratio
+    // should be very close to 1.0 (uniform energy distribution).
+    // Raw prevFrame: ~0.9977, windowed prevFrame: ~1.0000
+    expect(Math.abs(ratio - 1.0)).toBeLessThan(0.001);
   });
 });

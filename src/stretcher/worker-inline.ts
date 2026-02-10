@@ -62,6 +62,14 @@ function wsolaTimeStretch(channels, tempo, sampleRate) {
     return { output: channels.map(function() { return new Float32Array(0); }), length: 0 };
   }
 
+  var TEMPO_IDENTITY_EPSILON = 0.001;
+  if (Math.abs(tempo - 1.0) < TEMPO_IDENTITY_EPSILON) {
+    return {
+      output: channels.map(function(ch) { return new Float32Array(ch); }),
+      length: inputLength
+    };
+  }
+
   var synthesisHop = HOP_SIZE;
   var analysisHop = Math.round(HOP_SIZE * tempo);
   var numFrames = Math.floor((inputLength - FRAME_SIZE) / analysisHop) + 1;
@@ -129,7 +137,7 @@ function wsolaTimeStretch(channels, tempo, sampleRate) {
         if (outIdx >= estimatedOutputLength) break;
         var sample = input[inIdx];
         output[outIdx] += sample * windowFunc[i];
-        prevFrame[i] = sample;
+        prevFrame[i] = sample * windowFunc[i];
       }
     }
 

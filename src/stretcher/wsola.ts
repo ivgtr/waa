@@ -97,6 +97,15 @@ export function wsolaTimeStretch(
     return { output: channels.map(() => new Float32Array(0)), length: 0 };
   }
 
+  // At tempo≈1.0 (identity), skip WSOLA to avoid NCC search artifacts
+  const TEMPO_IDENTITY_EPSILON = 0.001;
+  if (Math.abs(tempo - 1.0) < TEMPO_IDENTITY_EPSILON) {
+    return {
+      output: channels.map((ch) => new Float32Array(ch)),
+      length: inputLength,
+    };
+  }
+
   // WSOLA: synthesisHop is fixed, analysisHop varies with tempo
   const synthesisHop = hopSize;
   const analysisHop = Math.round(hopSize * tempo);
@@ -177,7 +186,7 @@ export function wsolaTimeStretch(
 
         const sample = input[inIdx]!;
         output[outIdx]! += sample * windowFunc[i]!;
-        prevFrame[i] = sample;
+        prevFrame[i] = sample * windowFunc[i]!;
       }
     }
 
