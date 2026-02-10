@@ -36,7 +36,7 @@ export function $<T extends HTMLElement>(id: string): T {
 export function drawWaveform(
   canvas: HTMLCanvasElement,
   pairs: PeakPair[],
-  fillStyle = 'rgba(99, 102, 241, 0.6)',
+  progress = 0,
 ): void {
   const parent = canvas.parentElement;
   if (!parent) return;
@@ -50,7 +50,9 @@ export function drawWaveform(
   c.clearRect(0, 0, w, h);
   for (let i = 0; i < pairs.length; i++) {
     const { min, max } = pairs[i]!;
-    c.fillStyle = fillStyle;
+    c.fillStyle = i / pairs.length < progress
+      ? 'rgba(99, 102, 241, 0.9)'
+      : 'rgba(99, 102, 241, 0.4)';
     c.fillRect(i * barWidth, mid - max * mid, barWidth - 0.5, (max - min) * mid);
   }
 }
