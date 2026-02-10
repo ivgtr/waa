@@ -294,14 +294,14 @@ export function createStretcherEngine(
     return audioBuf;
   }
 
-  function playCurrentChunk(offsetInBuffer: number = 0): void {
+  function playCurrentChunk(offsetInBuffer = 0, skipFadeIn = false): void {
     const chunk = chunks[currentChunkIndex];
     if (!chunk || chunk.state !== "ready" || !chunk.outputBuffer) return;
 
     const audioBuf = createAudioBufferFromChunk(chunk);
     if (!audioBuf) return;
 
-    chunkPlayer.playChunk(audioBuf, ctx.currentTime, offsetInBuffer);
+    chunkPlayer.playChunk(audioBuf, ctx.currentTime, offsetInBuffer, skipFadeIn);
   }
 
   function advanceToNextChunk(): void {
@@ -527,7 +527,7 @@ export function createStretcherEngine(
       const resumePosition = chunkPlayer.getCurrentPosition();
       phase = "playing";
       chunkPlayer.resume();
-      playCurrentChunk(resumePosition);
+      playCurrentChunk(resumePosition, true);
     } else {
       enterBuffering("underrun");
     }

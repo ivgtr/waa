@@ -96,6 +96,31 @@ describe("createChunkPlayer – pause/resume 位置", () => {
     player.dispose();
   });
 
+  it("pause → playChunk(skipFadeIn=true) で 2つ目の GainNode にフェードインが適用されない", () => {
+    const player = createChunkPlayer(ctx, {
+      destination: ctx.destination,
+      crossfadeSec: 0.1,
+    });
+
+    const buf = createMockBuffer(10);
+
+    // 最初の playChunk はフェードインあり
+    player.playChunk(buf, ctx.currentTime, 0);
+    const gain1 = (ctx as any).createGain.mock.results[0].value;
+    expect(gain1.gain.setValueCurveAtTime).toHaveBeenCalled();
+
+    // pause
+    ctxTime = 105;
+    player.pause();
+
+    // resume 用の playChunk(skipFadeIn=true)
+    player.playChunk(buf, ctx.currentTime, 5, true);
+    const gain2 = (ctx as any).createGain.mock.results[1].value;
+    expect(gain2.gain.setValueCurveAtTime).not.toHaveBeenCalled();
+
+    player.dispose();
+  });
+
   it("複数回 pause/resume で位置ドリフトが蓄積しない", () => {
     const player = createChunkPlayer(ctx, {
       destination: ctx.destination,

@@ -251,7 +251,7 @@ export interface ConversionScheduler {
 // ---------------------------------------------------------------------------
 
 export interface ChunkPlayer {
-  playChunk(buffer: AudioBuffer, startTime: number, offsetInChunk?: number): void;
+  playChunk(buffer: AudioBuffer, startTime: number, offsetInChunk?: number, skipFadeIn?: boolean): void;
   scheduleNext(buffer: AudioBuffer, startTime: number): void;
   hasNextScheduled(): boolean;
   handleSeek(buffer: AudioBuffer, offsetInChunk: number): void;

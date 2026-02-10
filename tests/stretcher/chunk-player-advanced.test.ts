@@ -62,6 +62,36 @@ describe("createChunkPlayer – advanced", () => {
       player.dispose();
     });
 
+    it("skips fade-in when skipFadeIn=true", () => {
+      const player = createChunkPlayer(ctx, {
+        destination: ctx.destination,
+        crossfadeSec: 0.1,
+      });
+
+      const buf = createMockBuffer(8);
+      player.playChunk(buf, ctx.currentTime, 0, true);
+
+      const gain = ctx._gains[0]!;
+      expect(gain.gain.setValueCurveAtTime).not.toHaveBeenCalled();
+
+      player.dispose();
+    });
+
+    it("applies fade-in by default (skipFadeIn not set)", () => {
+      const player = createChunkPlayer(ctx, {
+        destination: ctx.destination,
+        crossfadeSec: 0.1,
+      });
+
+      const buf = createMockBuffer(8);
+      player.playChunk(buf, ctx.currentTime, 0);
+
+      const gain = ctx._gains[0]!;
+      expect(gain.gain.setValueCurveAtTime).toHaveBeenCalled();
+
+      player.dispose();
+    });
+
     it("applies crossfade curves on scheduleNext", () => {
       const player = createChunkPlayer(ctx, {
         destination: ctx.destination,

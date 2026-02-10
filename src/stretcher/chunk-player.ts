@@ -170,7 +170,7 @@ export function createChunkPlayer(ctx: AudioContext, options: ChunkPlayerOptions
     return ctx.currentTime - playStartCtxTime + playStartOffset;
   }
 
-  function playChunk(buffer: AudioBuffer, _startTime: number, offsetInChunk: number = 0): void {
+  function playChunk(buffer: AudioBuffer, _startTime: number, offsetInChunk = 0, skipFadeIn = false): void {
     cancelTransition();
     stopCurrentSource();
     stopNextSource();
@@ -188,7 +188,7 @@ export function createChunkPlayer(ctx: AudioContext, options: ChunkPlayerOptions
     currentSource.start(0, offsetInChunk);
 
     // Apply equal-power fade-in
-    if (crossfadeSec > 0) {
+    if (crossfadeSec > 0 && !skipFadeIn) {
       currentGain.gain.setValueCurveAtTime(fadeInCurve, ctx.currentTime, crossfadeSec);
     }
 
