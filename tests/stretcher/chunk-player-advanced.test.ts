@@ -499,6 +499,91 @@ describe("createChunkPlayer – advanced", () => {
   });
 
   // -----------------------------------------------------------------------
+  // P-02: 連続 playChunk での AudioNode disconnect
+  // -----------------------------------------------------------------------
+
+  describe("P-02: consecutive playChunk disconnect", () => {
+    it("previous source is disconnected when new playChunk is called", () => {
+      const player = createChunkPlayer(ctx, {
+        destination: ctx.destination,
+        crossfadeSec: 0,
+      });
+
+      const buf1 = createMockBuffer(8);
+      const buf2 = createMockBuffer(8);
+
+      player.playChunk(buf1, ctx.currentTime, 0);
+      const src1 = ctx._sources[ctx._sources.length - 1]!;
+      const gain1 = ctx._gains[ctx._gains.length - 1]!;
+
+      player.playChunk(buf2, ctx.currentTime, 0);
+
+      // Previous source and gain should be disconnected
+      expect(src1.disconnect).toHaveBeenCalled();
+      expect(gain1.disconnect).toHaveBeenCalled();
+      expect(src1.onended).toBeNull();
+    });
+
+    it("10 consecutive playChunk calls don't leak AudioNodes", () => {
+      const player = createChunkPlayer(ctx, {
+        destination: ctx.destination,
+        crossfadeSec: 0,
+      });
+
+      for (let i = 0; i < 10; i++) {
+        const buf = createMockBuffer(8);
+        player.playChunk(buf, ctx.currentTime, 0);
+      }
+
+      // All sources except the last should have been disconnected
+      for (let i = 0; i < ctx._sources.length - 1; i++) {
+        expect(ctx._sources[i]!.disconnect).toHaveBeenCalled();
+      }
+
+      // All gains except the last should have been disconnected
+      for (let i = 0; i < ctx._gains.length - 1; i++) {
+        expect(ctx._gains[i]!.disconnect).toHaveBeenCalled();
+      }
+
+      player.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // L-01: 100 チャンク遷移後の AudioNode 蓄積
+  // -----------------------------------------------------------------------
+
+  describe("L-01: AudioNode cleanup after many transitions", () => {
+    it("100 transitions disconnect all old sources", () => {
+      const player = createChunkPlayer(ctx, {
+        destination: ctx.destination,
+        crossfadeSec: 0,
+      });
+      const onTransition = vi.fn();
+      player.setOnTransition(onTransition);
+
+      // Play first chunk
+      const firstBuf = createMockBuffer(1);
+      player.playChunk(firstBuf, ctx.currentTime, 0);
+
+      for (let i = 0; i < 100; i++) {
+        const nextBuf = createMockBuffer(1);
+        player.scheduleNext(nextBuf, ctx.currentTime + 1);
+
+        // Trigger onended to cause transition
+        const src = ctx._sources[ctx._sources.length - 2]; // current source
+        if (src?.onended) src.onended();
+      }
+
+      // All sources except the last 1-2 should have been disconnected
+      const disconnectedCount = ctx._sources.filter(s => s.disconnect.mock.calls.length > 0).length;
+      expect(disconnectedCount).toBeGreaterThanOrEqual(99);
+
+      player.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // dispose safety
   // -----------------------------------------------------------------------
 

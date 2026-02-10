@@ -521,6 +521,165 @@ describe("createWorkerManager", () => {
   });
 
   // -----------------------------------------------------------------------
+  // W-01: cancelChunk → result arrives
+  // -----------------------------------------------------------------------
+
+  describe("cancelChunk then result arrives", () => {
+    it("W-01: result after cancelChunk still calls onResult and frees slot", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+      expect(manager.hasCapacity()).toBe(true); // still has second slot
+
+      // Cancel chunk 0 (sends cancel message, but worker may still return result)
+      manager.cancelChunk(0);
+
+      // Worker processes the cancel and responds with "cancelled"
+      workerStubs.simulateWorkerCancel(startIdx, 0);
+
+      // onResult should be called with the cancelled response
+      expect(onResult).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "cancelled",
+          chunkIndex: 0,
+        }),
+      );
+
+      // Slot should be freed
+      expect(manager.hasCapacity()).toBe(true);
+    });
+
+    it("W-01: result message after cancelChunk still calls onResult and frees slot", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+
+      // Cancel chunk 0
+      manager.cancelChunk(0);
+
+      // Worker didn't process cancel in time and sends result instead
+      workerStubs.simulateWorkerResult(startIdx, 0, 512);
+
+      // onResult should be called (cancel was a best-effort message)
+      expect(onResult).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "result",
+          chunkIndex: 0,
+        }),
+      );
+
+      // Slot should be freed
+      expect(manager.hasCapacity()).toBe(true);
+      // postTime should be cleaned up
+      expect(manager.getPostTimeForChunk(0)).toBeNull();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // W-02: terminate 後の onmessage/onerror
+  // -----------------------------------------------------------------------
+
+  describe("terminate then worker responds", () => {
+    it("W-02: onmessage handler is nulled after terminate", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+
+      const worker = workerStubs.workers[startIdx]!;
+      expect(worker.onmessage).not.toBeNull();
+
+      manager.terminate();
+
+      // onmessage and onerror should have been nulled
+      expect(worker.onmessage).toBeNull();
+      expect(worker.onerror).toBeNull();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // W-03: respawn 中の postConvert
+  // -----------------------------------------------------------------------
+
+  describe("postConvert during respawn", () => {
+    it("W-03: postConvert works after worker respawn", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+
+      // Crash first worker → respawn
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+      workerStubs.simulateWorkerCrash(startIdx, "Crash!");
+
+      // Respawned worker should exist
+      const respawnedIdx = workerStubs.workers.length - 1;
+      expect(workerStubs.workers[respawnedIdx]).toBeDefined();
+
+      // Should be able to post to respawned worker
+      manager.postConvert(1, [new Float32Array(1024)], 1.0, 44100);
+
+      // At least one worker should have received the postConvert
+      const totalPostCalls = workerStubs.workers
+        .slice(startIdx)
+        .reduce((sum, w) => sum + w.postMessage.mock.calls.filter(
+          (call: any) => call[0]?.type === "convert",
+        ).length, 0);
+      expect(totalPostCalls).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // M-02: postTimes cleanup on cancel/error
+  // -----------------------------------------------------------------------
+
+  describe("postTimes cleanup", () => {
+    it("M-02: postTimes cleaned up after cancelCurrent + cancel response", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+      manager.postConvert(1, [new Float32Array(1024)], 1.0, 44100);
+
+      expect(manager.getPostTimeForChunk(0)).not.toBeNull();
+      expect(manager.getPostTimeForChunk(1)).not.toBeNull();
+
+      manager.cancelCurrent();
+
+      // Simulate cancel responses
+      workerStubs.simulateWorkerCancel(startIdx, 0);
+      workerStubs.simulateWorkerCancel(startIdx + 1, 1);
+
+      expect(manager.getPostTimeForChunk(0)).toBeNull();
+      expect(manager.getPostTimeForChunk(1)).toBeNull();
+      expect(manager.getLastPostTime()).toBeNull();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // M-01: terminate timing
+  // -----------------------------------------------------------------------
+
+  describe("terminate timing", () => {
+    it("M-01: terminate during postConvert → subsequent ops are safe", () => {
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+
+      // Post a convert then immediately terminate
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+      manager.terminate();
+
+      // All subsequent operations should be safe
+      expect(() => manager.postConvert(1, [new Float32Array(1024)], 1.0, 44100)).not.toThrow();
+      expect(() => manager.cancelCurrent()).not.toThrow();
+      expect(() => manager.cancelChunk(0)).not.toThrow();
+      // After terminate, all workers are null so no capacity
+      expect(manager.hasCapacity()).toBe(false);
+      // postTimes are cleared by terminate
+      expect(manager.getLastPostTime()).toBeNull();
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // terminate
   // -----------------------------------------------------------------------
 

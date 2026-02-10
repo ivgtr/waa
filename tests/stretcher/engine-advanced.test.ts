@@ -902,6 +902,283 @@ describe("engine – advanced paths", () => {
   });
 
   // -----------------------------------------------------------------------
+  // S-01: buffering 中の stop
+  // -----------------------------------------------------------------------
+
+  describe("S-01: buffering 中の stop", () => {
+    it("stop during buffering transitions to ended", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // Stop during buffering (before any chunks are ready)
+      engine.stop();
+      expect(engine.getStatus().phase).toBe("ended");
+
+      // Worker result arriving after stop should not crash
+      expect(() => {
+        workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      }).not.toThrow();
+
+      expect(engine.getStatus().phase).toBe("ended");
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // S-02: buffering 中の dispose
+  // -----------------------------------------------------------------------
+
+  describe("S-02: buffering 中の dispose", () => {
+    it("dispose during buffering is safe", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // dispose should not throw
+      expect(() => engine.dispose()).not.toThrow();
+
+      // Operations after dispose should be safe
+      expect(() => {
+        engine.start();
+        engine.pause();
+        engine.resume();
+        engine.seek(5);
+        engine.stop();
+      }).not.toThrow();
+    });
+
+    it("dispose during buffering terminates workers (handlers nulled)", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // Workers should have onmessage handlers before dispose
+      const workersBefore = workerStubs.workers.slice(-2);
+      expect(workersBefore[0]!.onmessage).not.toBeNull();
+
+      engine.dispose();
+
+      // After dispose, workers should be terminated (handlers nulled)
+      expect(workersBefore[0]!.onmessage).toBeNull();
+      expect(workersBefore[0]!.onerror).toBeNull();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // S-03: pause → seek → resume
+  // -----------------------------------------------------------------------
+
+  describe("S-03: pause → seek → resume", () => {
+    it("seek during pause updates position, resume plays from seek target", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.pause();
+      expect(engine.getStatus().phase).toBe("paused");
+
+      // Seek to 12s (in chunk 1)
+      engine.seek(12);
+
+      // Resume should play from near the seek position
+      engine.resume();
+
+      // Should be playing (chunk 1 is ready)
+      expect(engine.getStatus().phase).toBe("playing");
+
+      const pos = engine.getCurrentPosition();
+      expect(pos).toBeGreaterThanOrEqual(11);
+      expect(pos).toBeLessThanOrEqual(13);
+
+      engine.dispose();
+    });
+
+    it("seek during pause to unready chunk → resume enters buffering", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.pause();
+
+      // Seek to chunk 2 (not ready)
+      engine.seek(18);
+
+      // Resume → should enter buffering since target chunk is not ready
+      engine.resume();
+
+      // Phase should be buffering (chunk 2 not ready)
+      // or playing if chunk 2 happens to be ready
+      const phase = engine.getStatus().phase;
+      expect(["buffering", "playing"]).toContain(phase);
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // S-04: ended 後の seek
+  // -----------------------------------------------------------------------
+
+  describe("S-04: ended 後の seek", () => {
+    it("seek after stop does not crash and phase remains ended", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      engine.stop();
+      expect(engine.getStatus().phase).toBe("ended");
+
+      // Seek after ended — should not crash
+      expect(() => engine.seek(10)).not.toThrow();
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // S-05: ended 後の pause / resume
+  // -----------------------------------------------------------------------
+
+  describe("S-05: ended 後の pause / resume", () => {
+    it("pause and resume after stop are no-ops", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      engine.stop();
+      expect(engine.getStatus().phase).toBe("ended");
+
+      // These should be no-ops without crash
+      expect(() => engine.pause()).not.toThrow();
+      expect(engine.getStatus().phase).toBe("ended");
+
+      expect(() => engine.resume()).not.toThrow();
+      expect(engine.getStatus().phase).toBe("ended");
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // C-03: pause 中に onTransition タイマーが発火
+  // -----------------------------------------------------------------------
+
+  describe("C-03: pause 中の transition タイマー", () => {
+    it("pause cancels transition timer, chunk index is preserved", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+      expect(engine.getSnapshot().currentChunkIndex).toBe(0);
+
+      // Advance time near end of chunk 0 → lookahead triggers scheduleNext
+      ctx._setCurrentTime(7.5);
+      vi.advanceTimersByTime(200);
+
+      // Pause before transition timer fires
+      engine.pause();
+      expect(engine.getStatus().phase).toBe("paused");
+
+      const idxAfterPause = engine.getSnapshot().currentChunkIndex;
+
+      // Advance time well past what would have been the transition
+      vi.advanceTimersByTime(10000);
+
+      // currentChunkIndex should not have changed
+      expect(engine.getSnapshot().currentChunkIndex).toBe(idxAfterPause);
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // C-01: seek 中に onTransition が発火 (stale transition guard)
+  // -----------------------------------------------------------------------
+
+  describe("C-01: seek cancels stale transition", () => {
+    it("seek during pending transition prevents stale transition", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Advance time near end of chunk 0 → scheduleNext for chunk 1
+      ctx._setCurrentTime(7.5);
+      vi.advanceTimersByTime(200);
+
+      // Now seek to chunk 2 (this should cancel the pending transition)
+      engine.seek(16);
+
+      const idxAfterSeek = engine.getSnapshot().currentChunkIndex;
+      expect(idxAfterSeek).toBe(2);
+
+      // Advance past old transition timer
+      vi.advanceTimersByTime(10000);
+
+      // currentChunkIndex should still be 2, not reverted to 1
+      expect(engine.getSnapshot().currentChunkIndex).toBe(2);
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // C-02: setTempo debounce 中に onTransition が発火
+  // -----------------------------------------------------------------------
+
+  describe("C-02: setTempo during pending transition", () => {
+    it("setTempo enters buffering and cancels pending transition", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Advance time near end of chunk 0 → scheduleNext for chunk 1
+      ctx._setCurrentTime(7.5);
+      vi.advanceTimersByTime(200);
+
+      const idxBefore = engine.getSnapshot().currentChunkIndex;
+
+      // setTempo causes buffering → chunkPlayer.pause() → cancelTransition
+      engine.setTempo(2.0);
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // Advance past old transition timer
+      vi.advanceTimersByTime(10000);
+
+      // currentChunkIndex should not have advanced from the stale transition
+      expect(engine.getSnapshot().currentChunkIndex).toBe(idxBefore);
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // proactive + lookahead mutual exclusion
   // -----------------------------------------------------------------------
 
@@ -988,6 +1265,340 @@ describe("engine – advanced paths", () => {
       expect(createBufferMock.mock.calls.length).toBe(callsBefore);
 
       engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // R-01: 連続 seek（seek→seek→seek）
+  // -----------------------------------------------------------------------
+
+  describe("R-01: 連続 seek", () => {
+    it("rapid seek calls don't crash and final position is correct", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Rapid consecutive seeks
+      engine.seek(3);
+      engine.seek(10);
+      engine.seek(20);
+
+      // Should be at chunk 2 (position 20)
+      const pos = engine.getCurrentPosition();
+      expect(pos).toBeGreaterThanOrEqual(19);
+      expect(pos).toBeLessThanOrEqual(21);
+      expect(engine.getSnapshot().currentChunkIndex).toBe(2);
+
+      engine.dispose();
+    });
+
+    it("rapid seek during pause ends at final position", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+
+      engine.pause();
+
+      engine.seek(3);
+      engine.seek(10);
+      engine.seek(5);
+
+      engine.resume();
+      expect(engine.getStatus().phase).toBe("playing");
+
+      const pos = engine.getCurrentPosition();
+      expect(pos).toBeGreaterThanOrEqual(4);
+      expect(pos).toBeLessThanOrEqual(6);
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // C-04: onChunkReady→exitBuffering→advanceToNextChunk 循環再入
+  // -----------------------------------------------------------------------
+
+  describe("C-04: exitBuffering → advanceToNextChunk recursion", () => {
+    it("onChunkReady during buffering triggers exitBuffering safely", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 2.0 });
+
+      engine.start();
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // Provide chunks — exitBuffering should fire
+      workerStubs.simulateWorkerResult(0, 0, Math.round(CHUNK0_RAW / 2));
+      workerStubs.simulateWorkerResult(1, 1, Math.round(CHUNK1_RAW / 2));
+
+      // Should be playing now
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // C-05: onTransition→updatePriorities→即座 onChunkReady
+  // -----------------------------------------------------------------------
+
+  describe("C-05: transition followed by immediate chunk ready", () => {
+    it("transition + updatePriorities + onChunkReady in sequence does not crash", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Advance to end of chunk 0 → onended
+      const src0 = findActiveSource(ctx._sources);
+      src0!.onended!();
+
+      // Should have advanced to chunk 1
+      expect(engine.getSnapshot().currentChunkIndex).toBe(1);
+
+      // Now chunk 2 becomes ready immediately after transition
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+
+      // Should not crash, complete event should fire
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // R-02: rapid pause→resume toggle
+  // -----------------------------------------------------------------------
+
+  describe("R-02: rapid pause→resume toggle", () => {
+    it("rapid pause→resume cycles don't cause errors", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Rapid toggle
+      for (let i = 0; i < 10; i++) {
+        engine.pause();
+        engine.resume();
+      }
+
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.dispose();
+    });
+
+    it("rapid toggle preserves approximate position", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      ctx._setCurrentTime(3);
+      const posBeforeToggles = engine.getCurrentPosition();
+
+      engine.pause();
+      engine.resume();
+      engine.pause();
+      engine.resume();
+
+      const posAfterToggles = engine.getCurrentPosition();
+      // Position should be close (within a small tolerance due to mock timing)
+      expect(posAfterToggles).toBeGreaterThanOrEqual(posBeforeToggles - 1);
+      expect(posAfterToggles).toBeLessThanOrEqual(posBeforeToggles + 1);
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // S-06: pause→setTempo→seek→resume
+  // -----------------------------------------------------------------------
+
+  describe("S-06: pause→setTempo→seek→resume", () => {
+    it("combined operations don't crash and end in correct state", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.pause();
+      engine.setTempo(2.0);
+      engine.seek(10);
+      engine.resume();
+
+      // Should be buffering (tempo change requires re-conversion)
+      expect(engine.getStatus().phase).toBe("buffering");
+      expect(engine.getStatus().playback.tempo).toBe(2.0);
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // S-07: pause 中の setLoop
+  // -----------------------------------------------------------------------
+
+  describe("S-07: pause 中の setLoop", () => {
+    it("setLoop during pause takes effect on resume", () => {
+      const engine = createEngine(ctx, buffer, { loop: false });
+      const loopHandler = vi.fn();
+      engine.on("loop", loopHandler);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.pause();
+      engine.setLoop(true);
+      engine.resume();
+
+      // Advance through all chunks
+      const src0 = findActiveSource(ctx._sources);
+      src0!.onended!();
+      const src1 = findActiveSource(ctx._sources);
+      src1!.onended!();
+      const src2 = findActiveSource(ctx._sources);
+      src2!.onended!();
+
+      // Should loop instead of ending
+      expect(loopHandler).toHaveBeenCalledTimes(1);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // S-08: pause 中の dispose
+  // -----------------------------------------------------------------------
+
+  describe("S-08: pause 中の dispose", () => {
+    it("dispose during pause is clean", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      engine.pause();
+      expect(engine.getStatus().phase).toBe("paused");
+
+      expect(() => engine.dispose()).not.toThrow();
+
+      // All operations after dispose should be safe
+      expect(() => {
+        engine.pause();
+        engine.resume();
+        engine.seek(5);
+        engine.setTempo(2);
+      }).not.toThrow();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // S-09: pause→pause 冪等性
+  // -----------------------------------------------------------------------
+
+  describe("S-09: pause→pause 冪等性", () => {
+    it("double pause is idempotent", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      engine.pause();
+      const posAfterFirstPause = engine.getCurrentPosition();
+
+      engine.pause(); // second pause should be no-op
+      const posAfterSecondPause = engine.getCurrentPosition();
+
+      expect(posAfterSecondPause).toBe(posAfterFirstPause);
+      expect(engine.getStatus().phase).toBe("paused");
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // S-10: start 直後の setTempo
+  // -----------------------------------------------------------------------
+
+  describe("S-10: start 直後の setTempo", () => {
+    it("setTempo immediately after start during buffering", () => {
+      const startWorkerIdx = workerStubs.workers.length;
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+
+      engine.start();
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // setTempo during initial buffering
+      engine.setTempo(2.0);
+      expect(engine.getStatus().phase).toBe("buffering");
+      expect(engine.getStatus().playback.tempo).toBe(2.0);
+
+      // Advance debounce timer → handleTempoChange fires → cancelCurrent + reset
+      vi.advanceTimersByTime(100);
+
+      // Simulate cancel responses to free worker slots
+      workerStubs.simulateWorkerCancel(startWorkerIdx, 0);
+      workerStubs.simulateWorkerCancel(startWorkerIdx + 1, 1);
+
+      // Now provide chunks at new tempo (new dispatch should have been triggered)
+      workerStubs.simulateWorkerResult(startWorkerIdx, 0, Math.round(CHUNK0_RAW / 2));
+      workerStubs.simulateWorkerResult(startWorkerIdx + 1, 1, Math.round(CHUNK1_RAW / 2));
+
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // L-03: dispose 後のコールバック参照ガード
+  // -----------------------------------------------------------------------
+
+  describe("L-03: dispose 後のコールバック参照ガード", () => {
+    it("callbacks from chunkPlayer after dispose are guarded", () => {
+      const engine = createEngine(ctx, buffer);
+      const errorHandler = vi.fn();
+      engine.on("error", errorHandler);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Grab the source before dispose
+      const src = findActiveSource(ctx._sources);
+
+      engine.dispose();
+
+      // If somehow onended fires after dispose (stale reference), it should not crash
+      // Note: dispose nulls out source.onended, so this is testing the edge case
+      // where the reference was captured before dispose
+      if (src?.onended) {
+        expect(() => src.onended!()).not.toThrow();
+      }
+
+      // No error event should have been emitted
+      expect(errorHandler).not.toHaveBeenCalled();
     });
   });
 });

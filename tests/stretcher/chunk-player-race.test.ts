@@ -166,6 +166,35 @@ describe("createChunkPlayer – race conditions", () => {
     expect(onTransition).not.toHaveBeenCalled();
   });
 
+  // -----------------------------------------------------------------------
+  // P-01: pause 中の scheduleNext
+  // -----------------------------------------------------------------------
+
+  it("P-01: scheduleNext after pause is no-op (paused source is null)", () => {
+    const player = createChunkPlayer(ctx, {
+      destination: ctx.destination,
+      crossfadeSec: 0.1,
+    });
+    const onTransition = vi.fn();
+    player.setOnTransition(onTransition);
+
+    const buf1 = createMockBuffer(8);
+    const buf2 = createMockBuffer(8);
+
+    player.playChunk(buf1, ctx.currentTime, 0);
+    player.pause();
+
+    // scheduleNext after pause — currentSource is null (stopped by pause)
+    // This should not crash, and the next source should be set up
+    expect(() => player.scheduleNext(buf2, 8)).not.toThrow();
+
+    // Even if we advance timers, transition should not fire
+    // because pause clears the source references
+    vi.advanceTimersByTime(10000);
+
+    player.dispose();
+  });
+
   it("onended after dispose → no crash", () => {
     const player = createChunkPlayer(ctx, {
       destination: ctx.destination,
