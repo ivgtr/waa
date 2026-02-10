@@ -25,6 +25,7 @@ export function createWorkerManager(
 ): WorkerManager {
   let workerURL: string | null = null;
   let terminated = false;
+  let allDeadFired = false;
   const postTimes = new Map<number, number>();
 
   const slots: WorkerSlot[] = [];
@@ -59,11 +60,13 @@ export function createWorkerManager(
       if (response.type === "result" || response.type === "cancelled") {
         slot.busy = false;
         slot.currentChunkIndex = null;
+        postTimes.delete(response.chunkIndex);
       }
 
       if (response.type === "error") {
         slot.busy = false;
         slot.currentChunkIndex = null;
+        postTimes.delete(response.chunkIndex);
         onError(response);
         return;
       }
@@ -80,6 +83,7 @@ export function createWorkerManager(
       slot.crashCount++;
 
       if (failedChunkIndex !== null) {
+        postTimes.delete(failedChunkIndex);
         onError({
           type: "error",
           chunkIndex: failedChunkIndex,
@@ -104,7 +108,8 @@ export function createWorkerManager(
           chunkIndex: failedChunkIndex ?? -1,
           error: `Worker crashed ${slot.crashCount} times, giving up`,
         });
-        if (isAllDead()) {
+        if (!allDeadFired && isAllDead()) {
+          allDeadFired = true;
           onAllDead?.();
         }
       }
@@ -126,7 +131,8 @@ export function createWorkerManager(
   }
 
   // If all Workers failed to spawn, notify immediately
-  if (isAllDead()) {
+  if (!allDeadFired && isAllDead()) {
+    allDeadFired = true;
     onAllDead?.();
   }
 

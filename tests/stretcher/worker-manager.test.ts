@@ -239,6 +239,47 @@ describe("createWorkerManager", () => {
       // onAllDead should be called since the only slot is dead
       expect(onAllDead).toHaveBeenCalled();
     });
+
+    it("onAllDead is called exactly once when poolSize=2 and both workers reach maxCrashes", () => {
+      const onAllDead = vi.fn();
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 2, 2, onAllDead);
+
+      // Crash slot[0] twice (maxCrashes=2)
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+      workerStubs.simulateWorkerCrash(startIdx, "Crash 1");
+      // Respawned → workers[startIdx+2]
+      manager.postConvert(1, [new Float32Array(1024)], 1.0, 44100);
+      workerStubs.simulateWorkerCrash(startIdx + 2, "Crash 2");
+      // slot[0] dead, slot[1] still alive → onAllDead not yet
+
+      // Crash slot[1] twice
+      manager.postConvert(2, [new Float32Array(1024)], 1.0, 44100);
+      workerStubs.simulateWorkerCrash(startIdx + 1, "Crash 3");
+      // Respawned → workers[startIdx+3]
+      manager.postConvert(3, [new Float32Array(1024)], 1.0, 44100);
+      workerStubs.simulateWorkerCrash(startIdx + 3, "Crash 4");
+      // Both dead → onAllDead fires
+
+      expect(onAllDead).toHaveBeenCalledTimes(1);
+    });
+
+    it("onAllDead is called exactly once when all workers fail to spawn (poolSize=3)", () => {
+      const originalWorker = globalThis.Worker;
+      vi.stubGlobal(
+        "Worker",
+        vi.fn(function MockWorkerCtor() {
+          throw new Error("Worker not supported");
+        }),
+      );
+
+      const onAllDead = vi.fn();
+      createWorkerManager(onResult, onError, 3, 3, onAllDead);
+
+      expect(onAllDead).toHaveBeenCalledTimes(1);
+
+      vi.stubGlobal("Worker", originalWorker);
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -417,6 +458,65 @@ describe("createWorkerManager", () => {
 
       expect(lastTime).not.toBeNull();
       expect(lastTime).toBe(Math.max(time0!, time1!));
+    });
+
+    it("clears postTime after result received", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+
+      expect(manager.getPostTimeForChunk(0)).not.toBeNull();
+
+      workerStubs.simulateWorkerResult(startIdx, 0, 512);
+
+      expect(manager.getPostTimeForChunk(0)).toBeNull();
+    });
+
+    it("clears postTime after cancelled received", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+
+      workerStubs.simulateWorkerCancel(startIdx, 0);
+
+      expect(manager.getPostTimeForChunk(0)).toBeNull();
+    });
+
+    it("clears postTime after error received", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+
+      workerStubs.simulateWorkerError(startIdx, 0, "conversion failed");
+
+      expect(manager.getPostTimeForChunk(0)).toBeNull();
+    });
+
+    it("clears postTime after worker crash (onerror)", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+      manager.postConvert(0, [new Float32Array(1024)], 1.0, 44100);
+
+      workerStubs.simulateWorkerCrash(startIdx, "Crash!");
+
+      expect(manager.getPostTimeForChunk(0)).toBeNull();
+    });
+
+    it("all postTimes are cleaned up after 10 chunk convert→result cycles", () => {
+      const startIdx = workerStubs.workers.length;
+      const manager = createWorkerManager(onResult, onError, 3, 2);
+
+      for (let i = 0; i < 10; i++) {
+        // Use slot 0 (startIdx) for odd, slot 1 (startIdx+1) for even
+        const slotIdx = startIdx + (i % 2);
+        manager.postConvert(i, [new Float32Array(1024)], 1.0, 44100);
+        workerStubs.simulateWorkerResult(slotIdx, i, 512);
+      }
+
+      for (let i = 0; i < 10; i++) {
+        expect(manager.getPostTimeForChunk(i)).toBeNull();
+      }
+      expect(manager.getLastPostTime()).toBeNull();
     });
   });
 
