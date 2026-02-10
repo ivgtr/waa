@@ -4,13 +4,29 @@ description: 与 React 等框架的集成模式、基于 Promise 的等待以及
 ---
 
 import { Code } from '@astrojs/starlight/components';
-import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../../snippets/use-cases/framework-integration';
+import ReactPlayerDemo from '../../../../components/demo/ReactPlayerDemo.tsx';
+import { reactPlayerDemo } from '../../../../snippets/examples/react-integration';
+import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../../snippets/examples/framework-integration';
 
 本指南介绍与 React 等框架的集成模式、基于 Promise 的等待以及 UI 动画同步。
 
 **使用的模块**: `adapters`, `play`
 
-## React 自定义 Hook
+## React 演示
+
+在 React 中使用 waa-play 的实际运行演示。使用 `useSyncExternalStore` 和 `subscribeSnapshot` / `getSnapshot` 来响应式管理播放状态。
+
+<ReactPlayerDemo client:load locale="zh-cn" />
+
+### 演示源代码
+
+此演示的核心逻辑。省略了 UI 渲染代码。
+
+<Code code={reactPlayerDemo} lang="tsx" />
+
+## 代码示例
+
+### 1. React 自定义 Hook
 
 `subscribeSnapshot` 和 `getSnapshot` 与 React 的 `useSyncExternalStore` 直接兼容。
 
@@ -25,7 +41,7 @@ import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothA
 
 </details>
 
-## 基于 Promise 的等待
+### 2. 基于 Promise 的等待
 
 您可以使用 Promise 等待播放完成或到达指定位置。
 
@@ -40,7 +56,7 @@ import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothA
 
 </details>
 
-## 平滑 UI 动画
+### 3. 平滑 UI 动画
 
 `onFrame` 基于 `requestAnimationFrame` 实现平滑的进度条和播放器更新。
 
@@ -59,5 +75,5 @@ import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothA
 
 ## 相关 API
 
-- [WaaPlayer](/waa/api/player/)
-- [函数 API](/waa/api/functions/)
+- [WaaPlayer](/waa/zh-cn/api/player/)
+- [函数 API](/waa/zh-cn/api/functions/)

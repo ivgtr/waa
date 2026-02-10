@@ -4,13 +4,20 @@ description: 音频可视化模式，包括波形渲染和实时频率显示
 ---
 
 import { Code } from '@astrojs/starlight/components';
-import { staticWaveformPlayer, staticWaveformFn, playbackCursorPlayer, playbackCursorFn, realtimeFrequencyPlayer, realtimeFrequencyFn } from '../../../../snippets/use-cases/visualization';
+import VisualizationDemo from '../../../../components/demo/VisualizationDemo.astro';
+import { staticWaveformPlayer, staticWaveformFn, playbackCursorPlayer, playbackCursorFn, realtimeFrequencyPlayer, realtimeFrequencyFn } from '../../../../snippets/examples/visualization';
 
 本指南介绍三种音频数据可视化模式：静态波形渲染、播放光标跟踪和实时频谱显示。
 
 **使用的模块**: `waveform`, `nodes`, `adapters`, `play`
 
-## 1. 静态波形渲染
+## 演示
+
+<VisualizationDemo locale="zh-cn" />
+
+## 代码示例
+
+### 1. 静态波形渲染
 
 从 AudioBuffer 提取峰值对并在 Canvas 上渲染波形。
 
@@ -25,7 +32,7 @@ import { staticWaveformPlayer, staticWaveformFn, playbackCursorPlayer, playbackC
 
 </details>
 
-## 2. 播放光标跟踪
+### 2. 播放光标跟踪
 
 根据播放位置移动光标，并对已播放部分进行颜色标记。
 
@@ -40,7 +47,7 @@ import { staticWaveformPlayer, staticWaveformFn, playbackCursorPlayer, playbackC
 
 </details>
 
-## 3. 实时频率显示
+### 3. 实时频率显示
 
 使用 AnalyserNode 在播放期间实时显示频谱。
 
@@ -57,5 +64,5 @@ import { staticWaveformPlayer, staticWaveformFn, playbackCursorPlayer, playbackC
 
 ## 相关 API
 
-- [WaaPlayer](/waa/api/player/)
-- [函数 API](/waa/api/functions/)
+- [WaaPlayer](/waa/zh-cn/api/player/)
+- [函数 API](/waa/zh-cn/api/functions/)

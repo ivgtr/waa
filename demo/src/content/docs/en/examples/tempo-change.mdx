@@ -1,0 +1,63 @@
+---
+title: Tempo Change
+description: Patterns for tempo changes and monitoring buffering state
+---
+
+import { Code } from '@astrojs/starlight/components';
+import TempoDemo from '../../../../components/demo/TempoDemo.astro';
+import ChunkBufferingDemo from '../../../../components/demo/ChunkBufferingDemo.astro';
+import { tempoChangePlayer, tempoChangeFn, bufferingMonitorPlayer, bufferingMonitorFn } from '../../../../snippets/examples/tempo-and-rhythm';
+
+Patterns for tempo changes and monitoring buffering state.
+
+**Modules used**: `play`, `stretcher`
+
+## Tempo Change Demo
+
+A demo of WSOLA-based pitch-preserving time-stretch. Use the tempo slider to change playback speed in real-time.
+
+<TempoDemo locale="en" />
+
+## Chunk Buffering Demo
+
+A demo to observe the chunk buffering mechanism of the WSOLA stretcher engine. Monitor chunk processing states and events in real-time.
+
+<ChunkBufferingDemo locale="en" />
+
+## Code Examples
+
+### 1. Pitch-Preserving Tempo Change
+
+Since `preservePitch` defaults to `true`, pitch is preserved by default in normal `play()` calls. For regular speed changes (where pitch also changes), explicitly set `preservePitch: false`.
+
+<Code code={tempoChangePlayer} lang="ts" />
+
+The WSOLA algorithm allows you to change tempo without changing pitch. Setting `preservePitch: true` (default) enables WSOLA-based time stretching.
+
+<details>
+<summary>Function API</summary>
+
+<Code code={tempoChangeFn} lang="ts" />
+
+</details>
+
+### 2. Monitoring Buffering State
+
+Since WSOLA processing is asynchronous, buffering may occur when changing tempo.
+
+<Code code={bufferingMonitorPlayer} lang="ts" />
+
+The `reason` in the `buffering` event is one of `"initial"` | `"seek"` | `"tempo-change"` | `"underrun"`. You can get detailed state information via the `stretcher` field in `getSnapshot()`.
+
+<details>
+<summary>Function API</summary>
+
+<Code code={bufferingMonitorFn} lang="ts" />
+
+</details>
+
+## Related API
+
+- [WaaPlayer](/waa/en/api/player/)
+- [Function API](/waa/en/api/functions/)
+- [Stretcher](/waa/en/api/stretcher/)

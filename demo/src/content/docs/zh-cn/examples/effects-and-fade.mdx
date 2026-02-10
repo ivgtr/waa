@@ -4,9 +4,14 @@ description: 如何使用 waa-play 实现音频效果和淡入淡出过渡
 ---
 
 import { Code } from '@astrojs/starlight/components';
-import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, effectChainPlayer, effectChainFn, fadeInOutPlayer, autoFadePlayer, fadeInOutFn, crossfadePlayer, crossfadeFn } from '../../../../snippets/use-cases/effects-and-fade';
+import EffectsDemo from '../../../../components/demo/EffectsDemo.astro';
+import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, effectChainPlayer, effectChainFn, fadeInOutPlayer, autoFadePlayer, fadeInOutFn, crossfadePlayer, crossfadeFn } from '../../../../snippets/examples/effects-and-fade';
 
 本指南演示如何使用 `nodes`、`fade` 和 `play` 模块实现音频效果和淡入淡出过渡。
+
+## 演示
+
+<EffectsDemo locale="zh-cn" />
 
 ## 使用的模块
 
@@ -14,7 +19,9 @@ import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, eff
 - **fade**: 淡入/淡出和交叉淡入淡出工具
 - **play**: 核心播放引擎（通过 `through` 选项路由效果链）
 
-## 1. 音量控制
+## 代码示例
+
+### 1. 音量控制
 
 使用 `createGain()` 创建 GainNode，并通过 `play()` 函数的 `through` 选项进行路由。使用 `rampGain()` 可以平滑地改变音量，不会产生爆音。
 
@@ -29,7 +36,7 @@ import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, eff
 
 </details>
 
-## 2. 立体声声像
+### 2. 立体声声像
 
 使用 `createPanner()` 创建 StereoPannerNode 以控制左右声像。值的范围从 `-1`（左）到 `1`（右）。
 
@@ -42,7 +49,7 @@ import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, eff
 
 </details>
 
-## 3. 效果链
+### 3. 效果链
 
 组合多个效果以实现丰富的声音处理。将节点数组传递给 `through` 以自动将它们链接在一起。
 
@@ -59,7 +66,7 @@ import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, eff
 
 </details>
 
-## 4. 淡入/淡出
+### 4. 淡入/淡出
 
 使用 `fadeIn()` 和 `fadeOut()` 实现平滑的淡入淡出效果。`autoFade()` 可以在播放开始和结束时自动淡入淡出。
 
@@ -76,7 +83,7 @@ import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, eff
 
 </details>
 
-## 5. DJ 交叉淡入淡出
+### 5. DJ 交叉淡入淡出
 
 在两个音轨之间交叉淡入淡出，实现无缝的 DJ 风格过渡。
 

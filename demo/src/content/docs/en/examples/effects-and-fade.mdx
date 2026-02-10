@@ -1,12 +1,17 @@
 ---
-title: Effects and Fade
+title: Effects & Fade
 description: How to implement audio effects and fade transitions with waa-play
 ---
 
 import { Code } from '@astrojs/starlight/components';
-import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, effectChainPlayer, effectChainFn, fadeInOutPlayer, autoFadePlayer, fadeInOutFn, crossfadePlayer, crossfadeFn } from '../../../../snippets/use-cases/effects-and-fade';
+import EffectsDemo from '../../../../components/demo/EffectsDemo.astro';
+import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, effectChainPlayer, effectChainFn, fadeInOutPlayer, autoFadePlayer, fadeInOutFn, crossfadePlayer, crossfadeFn } from '../../../../snippets/examples/effects-and-fade';
 
 This guide demonstrates how to implement audio effects and fade transitions using the `nodes`, `fade`, and `play` modules.
+
+## Demo
+
+<EffectsDemo locale="en" />
 
 ## Modules Used
 
@@ -14,7 +19,9 @@ This guide demonstrates how to implement audio effects and fade transitions usin
 - **fade**: Fade in/out and crossfade utilities
 - **play**: Core playback engine (routes effect chains via the `through` option)
 
-## 1. Volume Control
+## Code Examples
+
+### 1. Volume Control
 
 Create a GainNode with `createGain()` and route it through the `play()` function's `through` option. Use `rampGain()` to smoothly change volume without click noise.
 
@@ -29,7 +36,7 @@ When you pass a GainNode to the `through` option, `play()` automatically connect
 
 </details>
 
-## 2. Stereo Panning
+### 2. Stereo Panning
 
 Create a StereoPannerNode with `createPanner()` to control left-right panning. Values range from `-1` (left) to `1` (right).
 
@@ -42,7 +49,7 @@ Create a StereoPannerNode with `createPanner()` to control left-right panning. V
 
 </details>
 
-## 3. Effect Chain
+### 3. Effect Chain
 
 Combine multiple effects for rich sound processing. Pass an array of nodes to `through` to automatically chain them together.
 
@@ -59,7 +66,7 @@ Example using `chain()` to explicitly build a node graph:
 
 </details>
 
-## 4. Fade In/Out
+### 4. Fade In/Out
 
 Use `fadeIn()` and `fadeOut()` for smooth fade effects. `autoFade()` automates fades at playback start and end.
 
@@ -76,7 +83,7 @@ Use `autoFade()` to automatically set fades at playback start and end.
 
 </details>
 
-## 5. DJ Crossfade
+### 5. DJ Crossfade
 
 Crossfade between two tracks for seamless DJ-style transitions.
 

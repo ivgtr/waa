@@ -4,13 +4,29 @@ description: Integration patterns with frameworks like React, Promise-based wait
 ---
 
 import { Code } from '@astrojs/starlight/components';
-import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../../snippets/use-cases/framework-integration';
+import ReactPlayerDemo from '../../../../components/demo/ReactPlayerDemo.tsx';
+import { reactPlayerDemo } from '../../../../snippets/examples/react-integration';
+import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../../snippets/examples/framework-integration';
 
 This guide covers integration patterns with frameworks like React, Promise-based waiting, and UI animation synchronization.
 
 **Modules used**: `adapters`, `play`
 
-## React Custom Hook
+## React Demo
+
+A working demo of waa-play with React. Uses `useSyncExternalStore` with `subscribeSnapshot` / `getSnapshot` to reactively manage playback state.
+
+<ReactPlayerDemo client:load locale="en" />
+
+### Demo Source Code
+
+The core logic of this demo. UI rendering code is omitted.
+
+<Code code={reactPlayerDemo} lang="tsx" />
+
+## Code Examples
+
+### 1. React Custom Hook
 
 `subscribeSnapshot` and `getSnapshot` are directly compatible with React's `useSyncExternalStore`.
 
@@ -25,7 +41,7 @@ This guide covers integration patterns with frameworks like React, Promise-based
 
 </details>
 
-## Promise-Based Waiting
+### 2. Promise-Based Waiting
 
 You can wait for playback completion or position arrival using Promises.
 
@@ -40,7 +56,7 @@ You can wait for playback completion or position arrival using Promises.
 
 </details>
 
-## Smooth UI Animation
+### 3. Smooth UI Animation
 
 `onFrame` enables smooth progress bar and seeker updates based on `requestAnimationFrame`.
 
@@ -59,5 +75,5 @@ You can wait for playback completion or position arrival using Promises.
 
 ## Related API
 
-- [WaaPlayer](/waa/api/player/)
-- [Function API](/waa/api/functions/)
+- [WaaPlayer](/waa/en/api/player/)
+- [Function API](/waa/en/api/functions/)

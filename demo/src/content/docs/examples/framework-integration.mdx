@@ -1,16 +1,32 @@
 ---
-title: Framework 統合
+title: フレームワーク統合
 description: React など framework との統合パターン、Promise ベースの待機、UI アニメーション連携
 ---
 
 import { Code } from '@astrojs/starlight/components';
-import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../snippets/use-cases/framework-integration';
+import ReactPlayerDemo from '../../../components/demo/ReactPlayerDemo.tsx';
+import { reactPlayerDemo } from '../../../snippets/examples/react-integration';
+import { reactHookPlayer, reactHookFn, promiseWaitPlayer, promiseWaitFn, smoothAnimationPlayer, smoothAnimationFn } from '../../../snippets/examples/framework-integration';
 
 React など framework との統合パターンや、Promise ベースの待機、UI アニメーション連携について説明します。
 
 **使用モジュール**: `adapters`, `play`
 
-## React カスタムフック
+## React デモ
+
+React で waa-play を使用する実動デモです。`useSyncExternalStore` と `subscribeSnapshot` / `getSnapshot` を使って、再生状態をリアクティブに管理します。
+
+<ReactPlayerDemo client:load locale="ja" />
+
+### デモのソースコード
+
+このデモのコアロジックです。UI の描画コードは省略しています。
+
+<Code code={reactPlayerDemo} lang="tsx" />
+
+## コード例
+
+### 1. React カスタムフック
 
 `subscribeSnapshot` と `getSnapshot` は React の `useSyncExternalStore` と直接互換性があります。
 
@@ -25,7 +41,7 @@ React など framework との統合パターンや、Promise ベースの待機�
 
 </details>
 
-## Promise ベース待機
+### 2. Promise ベース待機
 
 再生完了やポジション到達を Promise で待機できます。
 
@@ -40,7 +56,7 @@ React など framework との統合パターンや、Promise ベースの待機�
 
 </details>
 
-## スムーズ UI アニメーション
+### 3. スムーズ UI アニメーション
 
 `onFrame` で `requestAnimationFrame` ベースのスムーズな progress bar・seeker 更新が可能です。
 

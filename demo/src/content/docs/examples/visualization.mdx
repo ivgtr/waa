@@ -1,16 +1,23 @@
 ---
-title: Visualization
+title: ビジュアライゼーション
 description: 波形描画やリアルタイム周波数表示など、audio のビジュアル表現パターン
 ---
 
 import { Code } from '@astrojs/starlight/components';
-import { staticWaveformPlayer, staticWaveformFn, playbackCursorPlayer, playbackCursorFn, realtimeFrequencyPlayer, realtimeFrequencyFn } from '../../../snippets/use-cases/visualization';
+import VisualizationDemo from '../../../components/demo/VisualizationDemo.astro';
+import { staticWaveformPlayer, staticWaveformFn, playbackCursorPlayer, playbackCursorFn, realtimeFrequencyPlayer, realtimeFrequencyFn } from '../../../snippets/examples/visualization';
 
 Audio データを視覚的に表現する3つのパターンを紹介します。静的な波形描画、再生カーソル連動、リアルタイム周波数表示を実装する方法を学びます。
 
 **使用モジュール**: `waveform`, `nodes`, `adapters`, `play`
 
-## 1. 静的波形描画
+## デモ
+
+<VisualizationDemo locale="ja" />
+
+## コード例
+
+### 1. 静的波形描画
 
 AudioBuffer からピークペアを抽出し、Canvas に波形を描画します。
 
@@ -25,7 +32,7 @@ AudioBuffer からピークペアを抽出し、Canvas に波形を描画しま�
 
 </details>
 
-## 2. 再生カーソル連動
+### 2. 再生カーソル連動
 
 再生位置に応じてカーソルを動かし、再生済み部分を色分けします。
 
@@ -40,7 +47,7 @@ AudioBuffer からピークペアを抽出し、Canvas に波形を描画しま�
 
 </details>
 
-## 3. リアルタイム周波数表示
+### 3. リアルタイム周波数表示
 
 AnalyserNode を使用して、再生中の周波数スペクトルをリアルタイムで表示します。
 
