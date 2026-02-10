@@ -128,6 +128,10 @@ export function createConversionScheduler(
   ): void {
     const chunk = chunks[chunkIndex];
     if (!chunk) return;
+    if (chunk.state !== "converting") {
+      dispatchNext();
+      return;
+    }
     chunk.state = "ready";
     chunk.outputBuffer = outputData;
     chunk.outputLength = outputLength;

@@ -267,6 +267,81 @@ describe("createConversionScheduler – advanced", () => {
     scheduler.dispose();
   });
 
+  it("handleResult skips stale result when chunk state is not converting", () => {
+    const chunks = makeChunks(5);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+    const onReady = vi.fn();
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      undefined,
+      onReady,
+    );
+
+    scheduler.start(0);
+
+    // Complete chunk 0 at tempo 1.0
+    wm.simulateResult(0);
+    (scheduler as any)._handleResult(0, [new Float32Array(1024)], 1024);
+    expect(chunks[0]!.state).toBe("ready");
+    onReady.mockClear();
+
+    // Block re-dispatch so chunks stay "pending" after tempo change
+    wm.setCapacity(false);
+
+    // Tempo change resets chunk 0 to "pending" (queued by updatePriorities)
+    scheduler.handleTempoChange(2.0);
+    // With no capacity, chunk stays in "queued" state (not re-dispatched)
+    expect(chunks[0]!.state).toBe("queued");
+
+    // Stale result arrives for chunk 0 (old tempo) — chunk is "queued", not "converting"
+    (scheduler as any)._handleResult(0, [new Float32Array(512)], 512);
+
+    // Should NOT be set to "ready"
+    expect(chunks[0]!.state).not.toBe("ready");
+    // onChunkReady should NOT be called
+    expect(onReady).not.toHaveBeenCalled();
+
+    scheduler.dispose();
+  });
+
+  it("handleResult accepts result when chunk is in converting state", () => {
+    const chunks = makeChunks(3);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+    const onReady = vi.fn();
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      undefined,
+      onReady,
+    );
+
+    scheduler.start(0);
+
+    // Chunk 0 should be in "converting" state after dispatch
+    expect(chunks[0]!.state).toBe("converting");
+
+    // Normal result arrives while chunk is "converting"
+    wm.simulateResult(0);
+    (scheduler as any)._handleResult(0, [new Float32Array(1024)], 1024);
+
+    // Should be set to "ready"
+    expect(chunks[0]!.state).toBe("ready");
+    expect(onReady).toHaveBeenCalledWith(0);
+
+    scheduler.dispose();
+  });
+
   it("handleResult with invalid chunk index is safe", () => {
     const chunks = makeChunks(3);
     const wm = createMockWorkerManager();
