@@ -92,7 +92,8 @@
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.map"
   ],
   "scripts": {
     "build": "tsup",
