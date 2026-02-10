@@ -170,7 +170,12 @@ export function createChunkPlayer(ctx: AudioContext, options: ChunkPlayerOptions
     return ctx.currentTime - playStartCtxTime + playStartOffset;
   }
 
-  function playChunk(buffer: AudioBuffer, _startTime: number, offsetInChunk = 0, skipFadeIn = false): void {
+  function playChunk(
+    buffer: AudioBuffer,
+    _startTime: number,
+    offsetInChunk = 0,
+    skipFadeIn = false,
+  ): void {
     cancelTransition();
     stopCurrentSource();
     stopNextSource();

@@ -51,9 +51,7 @@ describe("calcPositionInOriginalBuffer", () => {
 
   it("returns bufferingResumePosition when phase is paused and resume position is set", () => {
     expect(
-      calcPositionInOriginalBuffer(
-        makeParams({ phase: "paused", bufferingResumePosition: 5.0 }),
-      ),
+      calcPositionInOriginalBuffer(makeParams({ phase: "paused", bufferingResumePosition: 5.0 })),
     ).toBe(5.0);
   });
 

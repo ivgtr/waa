@@ -576,7 +576,9 @@ describe("createChunkPlayer – advanced", () => {
       }
 
       // All sources except the last 1-2 should have been disconnected
-      const disconnectedCount = ctx._sources.filter(s => s.disconnect.mock.calls.length > 0).length;
+      const disconnectedCount = ctx._sources.filter(
+        (s) => s.disconnect.mock.calls.length > 0,
+      ).length;
       expect(disconnectedCount).toBeGreaterThanOrEqual(99);
 
       player.dispose();

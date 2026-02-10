@@ -306,8 +306,7 @@ describe("wsolaTimeStretch", () => {
 
     const meanNBE = nonBoundaryEnergies.reduce((a, b) => a + b, 0) / nonBoundaryEnergies.length;
     const varNBE =
-      nonBoundaryEnergies.reduce((a, b) => a + (b - meanNBE) ** 2, 0) /
-      nonBoundaryEnergies.length;
+      nonBoundaryEnergies.reduce((a, b) => a + (b - meanNBE) ** 2, 0) / nonBoundaryEnergies.length;
     const cvNonBoundary = Math.sqrt(varNBE) / meanNBE;
 
     const ratio = cvBoundary / cvNonBoundary;

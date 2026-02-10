@@ -622,9 +622,12 @@ describe("createWorkerManager", () => {
       // At least one worker should have received the postConvert
       const totalPostCalls = workerStubs.workers
         .slice(startIdx)
-        .reduce((sum, w) => sum + w.postMessage.mock.calls.filter(
-          (call: any) => call[0]?.type === "convert",
-        ).length, 0);
+        .reduce(
+          (sum, w) =>
+            sum +
+            w.postMessage.mock.calls.filter((call: any) => call[0]?.type === "convert").length,
+          0,
+        );
       expect(totalPostCalls).toBeGreaterThanOrEqual(2);
     });
   });
