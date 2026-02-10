@@ -1,0 +1,43 @@
+---
+title: チャンクバッファリング
+description: WSOLA stretcher のチャンクバッファリング動作を可視化するデモ
+---
+
+import ChunkBufferingDemo from '../../../components/demo/ChunkBufferingDemo.astro';
+
+WSOLA stretcher エンジンのチャンクバッファリングの仕組みを観察するデモです。
+
+- **チャンクストリップ**: 各チャンクの処理状態（pending → queued → converting → ready）をリアルタイム表示
+- **凡例**: 各色の意味を確認できます
+- **イベントログ**: buffering 開始/終了、チャンク遷移、buffer health 変化をリアルタイムに記録
+- **テンポスライダー**: テンポ変更時のチャンク再スケジューリングを観察
+- **シーク**: 波形をクリックして新しい位置からのチャンク読み込みを確認
+
+<ChunkBufferingDemo locale="ja" />
+
+## コード例
+
+### Stretcher Snapshot の取得
+
+```ts
+import { WaaPlayer } from "waa-play";
+
+const player = new WaaPlayer();
+const buffer = await player.load("/music.mp3");
+
+const playback = player.play(buffer, {
+  playbackRate: 1.0,
+  preservePitch: true,
+});
+
+const stop = player.onFrame(playback, (snapshot) => {
+  const { stretcher } = snapshot;
+  if (stretcher) {
+    console.log(`Chunk states: ${stretcher.chunkStates.join(", ")}`);
+    console.log(`Current chunk: #${stretcher.currentChunkIndex}`);
+    console.log(`Buffer health: ${stretcher.bufferHealth}`);
+    console.log(`Buffering: ${stretcher.buffering}`);
+    console.log(`Ahead: ${stretcher.aheadSeconds.toFixed(1)}s`);
+  }
+});
+```

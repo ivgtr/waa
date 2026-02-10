@@ -59,6 +59,7 @@ export default defineConfig({
             { label: 'エフェクトとフェード', translations: { en: 'Effects & Fade', 'zh-CN': '效果与淡化' }, slug: 'demos/effects-and-fade' },
             { label: 'ビジュアライゼーション', translations: { en: 'Visualization', 'zh-CN': '可视化' }, slug: 'demos/visualization' },
             { label: 'テンポ変更', translations: { en: 'Tempo Change', 'zh-CN': '节奏变更' }, slug: 'demos/tempo-change' },
+            { label: 'チャンクバッファリング', translations: { en: 'Chunk Buffering', 'zh-CN': '分块缓冲' }, slug: 'demos/chunk-buffering' },
             { label: 'React 統合', translations: { en: 'React Integration', 'zh-CN': 'React 集成' }, slug: 'demos/react-integration' },
           ],
         },
