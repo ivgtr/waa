@@ -48,7 +48,7 @@ describe("createWorkerManager", () => {
     it("calls onAllDead if all workers fail to spawn", () => {
       // Make Worker constructor throw
       const originalWorker = globalThis.Worker;
-      vi.stubGlobal("Worker", vi.fn(() => {
+      vi.stubGlobal("Worker", vi.fn(function MockWorkerCtor() {
         throw new Error("Worker not supported");
       }));
 

@@ -14,11 +14,14 @@ const mockWorker = {
   removeEventListener: vi.fn(),
 };
 
-vi.stubGlobal("Worker", vi.fn(() => ({ ...mockWorker })));
-vi.stubGlobal("URL", {
-  createObjectURL: vi.fn(() => "blob:mock"),
-  revokeObjectURL: vi.fn(),
-});
+vi.stubGlobal("Worker", vi.fn(function MockWorkerCtor(this: typeof mockWorker) {
+  Object.assign(this, { ...mockWorker });
+}));
+const OriginalURL = globalThis.URL;
+vi.stubGlobal("URL", Object.assign(
+  function MockURL(...args: ConstructorParameters<typeof URL>) { return new OriginalURL(...args); } as unknown as typeof URL,
+  { createObjectURL: vi.fn(() => "blob:mock"), revokeObjectURL: vi.fn(), prototype: OriginalURL.prototype, canParse: OriginalURL.canParse },
+));
 vi.stubGlobal("Blob", vi.fn());
 
 describe("createStretcherEngine", () => {

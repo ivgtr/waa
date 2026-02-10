@@ -98,6 +98,8 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
+    "test:unit": "vitest run --project=unit",
+    "test:browser": "vitest run --project=browser",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
@@ -123,10 +125,12 @@
   },
   "homepage": "https://ivgtr.github.io/waa/",
   "bugs": "https://github.com/ivgtr/waa/issues",
-  "dependencies": {},
   "devDependencies": {
+    "@vitest/browser": "^4.0.18",
+    "@vitest/browser-playwright": "^4.0.18",
+    "playwright": "^1.58.2",
     "tsup": "^8.4.0",
     "typescript": "^5.7.0",
-    "vitest": "^2.1.0"
+    "vitest": "^4.0.18"
   }
 }

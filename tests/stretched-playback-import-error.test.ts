@@ -50,8 +50,10 @@ function createMockAudioBuffer(durationSec: number): AudioBuffer {
   } as unknown as AudioBuffer;
 }
 
-function flushPromises(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0));
+// Vitest 4.x の fake timers は動的 import() の Promise 解決をブロックするため、
+// real timers で短い待機を使う
+function waitForImportCatch(): Promise<void> {
+  return new Promise((r) => setTimeout(r, 50));
 }
 
 // ---------------------------------------------------------------------------
@@ -63,13 +65,8 @@ describe("createStretchedPlayback — dynamic import .catch()", () => {
   let buffer: AudioBuffer;
 
   beforeEach(() => {
-    vi.useFakeTimers();
     ctx = createMockAudioContext();
     buffer = createMockAudioBuffer(10);
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it("createStretcherEngine が throw → state が stopped に遷移し statechange/ended が emit される", async () => {
@@ -80,7 +77,7 @@ describe("createStretchedPlayback — dynamic import .catch()", () => {
     pb.on("statechange", statechangeHandler);
     pb.on("ended", endedHandler);
 
-    await vi.advanceTimersByTimeAsync(0);
+    await waitForImportCatch();
 
     expect(statechangeHandler).toHaveBeenCalledWith({ state: "stopped" });
     expect(endedHandler).toHaveBeenCalledTimes(1);
@@ -90,7 +87,7 @@ describe("createStretchedPlayback — dynamic import .catch()", () => {
   it("catch 後の getCurrentTime/getDuration/getProgress が正しい値を返す", async () => {
     const pb = play(ctx, buffer);
 
-    await vi.advanceTimersByTimeAsync(0);
+    await waitForImportCatch();
 
     expect(pb.getCurrentTime()).toBe(0);
     expect(pb.getDuration()).toBe(10);
@@ -107,7 +104,7 @@ describe("createStretchedPlayback — dynamic import .catch()", () => {
 
     pb.dispose();
 
-    await vi.advanceTimersByTimeAsync(0);
+    await waitForImportCatch();
 
     expect(statechangeHandler).not.toHaveBeenCalled();
     expect(endedHandler).not.toHaveBeenCalled();
@@ -125,7 +122,7 @@ describe("createStretchedPlayback — dynamic import .catch()", () => {
     statechangeHandler.mockClear();
     endedHandler.mockClear();
 
-    await vi.advanceTimersByTimeAsync(0);
+    await waitForImportCatch();
 
     // stop() already set state="stopped", so setState guard prevents double-fire
     expect(statechangeHandler).not.toHaveBeenCalled();
@@ -145,7 +142,7 @@ describe("createStretchedPlayback — dynamic import .catch()", () => {
     statechangeHandler.mockClear();
     endedHandler.mockClear();
 
-    await vi.advanceTimersByTimeAsync(0);
+    await waitForImportCatch();
 
     expect(pb.getState()).toBe("stopped");
     expect(statechangeHandler).toHaveBeenCalledWith({ state: "stopped" });

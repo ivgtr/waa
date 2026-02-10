@@ -25,23 +25,21 @@ const bufferSourceInstances: Array<{
 
 vi.stubGlobal(
   "Worker",
-  vi.fn(() => {
-    const worker = {
-      postMessage: vi.fn(),
-      terminate: vi.fn(),
-      onmessage: null as ((e: MessageEvent) => void) | null,
-      onerror: null as ((e: ErrorEvent) => void) | null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    };
-    workerInstances.push(worker);
-    return worker;
+  vi.fn(function MockWorkerCtor(this: Record<string, unknown>) {
+    this.postMessage = vi.fn();
+    this.terminate = vi.fn();
+    this.onmessage = null;
+    this.onerror = null;
+    this.addEventListener = vi.fn();
+    this.removeEventListener = vi.fn();
+    workerInstances.push(this as unknown as (typeof workerInstances)[number]);
   }),
 );
-vi.stubGlobal("URL", {
-  createObjectURL: vi.fn(() => "blob:mock"),
-  revokeObjectURL: vi.fn(),
-});
+const OriginalURL = globalThis.URL;
+vi.stubGlobal("URL", Object.assign(
+  function MockURL(...args: ConstructorParameters<typeof URL>) { return new OriginalURL(...args); } as unknown as typeof URL,
+  { createObjectURL: vi.fn(() => "blob:mock"), revokeObjectURL: vi.fn(), prototype: OriginalURL.prototype, canParse: OriginalURL.canParse },
+));
 vi.stubGlobal("Blob", vi.fn());
 
 // ---------------------------------------------------------------------------

@@ -297,24 +297,30 @@ export function stubWorkerGlobals(): {
 
   vi.stubGlobal(
     "Worker",
-    vi.fn(() => {
-      const worker: MockWorker = {
-        postMessage: vi.fn(),
-        terminate: vi.fn(),
-        onmessage: null,
-        onerror: null,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      };
-      workers.push(worker);
-      return worker;
+    vi.fn(function MockWorkerCtor(this: MockWorker) {
+      this.postMessage = vi.fn();
+      this.terminate = vi.fn();
+      this.onmessage = null;
+      this.onerror = null;
+      this.addEventListener = vi.fn();
+      this.removeEventListener = vi.fn();
+      workers.push(this);
     }),
   );
 
-  vi.stubGlobal("URL", {
-    createObjectURL: vi.fn(() => "blob:mock"),
-    revokeObjectURL: vi.fn(),
-  });
+  const OriginalURL = globalThis.URL;
+  const MockURL = Object.assign(
+    function MockURL(...args: ConstructorParameters<typeof URL>) {
+      return new OriginalURL(...args);
+    } as unknown as typeof URL,
+    {
+      createObjectURL: vi.fn(() => "blob:mock"),
+      revokeObjectURL: vi.fn(),
+      prototype: OriginalURL.prototype,
+      canParse: OriginalURL.canParse,
+    },
+  );
+  vi.stubGlobal("URL", MockURL);
 
   vi.stubGlobal("Blob", vi.fn());
 
