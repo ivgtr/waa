@@ -13,8 +13,8 @@ import {
   KEEP_AHEAD_SECONDS,
   KEEP_BEHIND_CHUNKS,
   KEEP_BEHIND_SECONDS,
-  LOOKAHEAD_THRESHOLD_SEC,
   OVERLAP_SEC,
+  PROACTIVE_SCHEDULE_THRESHOLD_SEC,
   WORKER_POOL_SIZE,
 } from "./constants.js";
 import { createConversionEstimator } from "./conversion-estimator.js";
@@ -246,7 +246,7 @@ export function createStretcherEngine(
         const elapsed = chunkPlayer.getCurrentPosition();
         const remaining = curOutputDuration - elapsed;
 
-        if (remaining <= LOOKAHEAD_THRESHOLD_SEC) {
+        if (remaining <= PROACTIVE_SCHEDULE_THRESHOLD_SEC) {
           const nextChunk = chunks[chunkIndex];
           if (nextChunk?.outputBuffer) {
             const audioBuffer = createAudioBufferFromChunk(nextChunk);

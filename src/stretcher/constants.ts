@@ -41,4 +41,5 @@ export const ESTIMATOR_WINDOW_SIZE = 10;
 
 // Playback lookahead
 export const LOOKAHEAD_INTERVAL_MS = 200;
-export const LOOKAHEAD_THRESHOLD_SEC = 1.5;
+export const LOOKAHEAD_THRESHOLD_SEC = 3.0;
+export const PROACTIVE_SCHEDULE_THRESHOLD_SEC = 5.0;
