@@ -5,10 +5,7 @@
 /**
  * Create a `GainNode` with an optional initial value.
  */
-export function createGain(
-  ctx: AudioContext,
-  initialValue?: number,
-): GainNode {
+export function createGain(ctx: AudioContext, initialValue?: number): GainNode {
   const gain = ctx.createGain();
   if (initialValue !== undefined) {
     gain.gain.value = initialValue;
@@ -20,11 +17,7 @@ export function createGain(
  * Smoothly ramp a `GainNode` to a target value over `duration` seconds using
  * `linearRampToValueAtTime`. This avoids audible clicks when changing volume.
  */
-export function rampGain(
-  gain: GainNode,
-  target: number,
-  duration: number,
-): void {
+export function rampGain(gain: GainNode, target: number, duration: number): void {
   const now = gain.context.currentTime;
   gain.gain.cancelScheduledValues(now);
   gain.gain.setValueAtTime(gain.gain.value, now);
@@ -87,10 +80,7 @@ export function createFilter(
 /**
  * Create a `StereoPannerNode`.
  */
-export function createPanner(
-  ctx: AudioContext,
-  pan?: number,
-): StereoPannerNode {
+export function createPanner(ctx: AudioContext, pan?: number): StereoPannerNode {
   const panner = ctx.createStereoPanner();
   if (pan !== undefined) {
     panner.pan.value = pan;

@@ -526,6 +526,108 @@
   50% { opacity: 0.4; }
 }
 
+/* ── Chunk Buffering Legend ──────────────────────────────────── */
+
+.demo-wrapper .cb-legend {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+
+.demo-wrapper .cb-legend h3 {
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.demo-wrapper .cb-legend-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.demo-wrapper .cb-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.demo-wrapper .cb-legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.demo-wrapper .cb-swatch-pending    { background-color: #3f3f46; }
+.demo-wrapper .cb-swatch-queued     { background-color: #a16207; }
+.demo-wrapper .cb-swatch-converting { background-color: #6366f1; }
+.demo-wrapper .cb-swatch-ready      { background-color: #22c55e; }
+.demo-wrapper .cb-swatch-evicted    { background-color: #27272a; }
+.demo-wrapper .cb-swatch-playhead   { background-color: #fff; outline: 2px solid #fff; outline-offset: -1px; width: 10px; height: 10px; margin: 2px; }
+
+/* ── Chunk Buffering Event Log ──────────────────────────────── */
+
+.demo-wrapper .cb-event-log {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+
+.demo-wrapper .cb-event-log h3 {
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.demo-wrapper .cb-event-log-entries {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.demo-wrapper .cb-log-entry {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.demo-wrapper .cb-log-entry:last-child {
+  border-bottom: none;
+}
+
+.demo-wrapper .cb-log-timestamp {
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.demo-wrapper .cb-log-message {
+  color: var(--text);
+}
+
+.demo-wrapper .cb-log-entry-new {
+  animation: cb-fade-in 0.3s ease;
+}
+
+@keyframes cb-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Visualizer ──────────────────────────────────────────────── */
 
 .demo-wrapper #visualizer-canvas {

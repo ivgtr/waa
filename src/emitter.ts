@@ -5,16 +5,10 @@
 /** A minimal, type-safe event emitter. */
 export interface Emitter<Events extends Record<string, any> = Record<string, unknown>> {
   /** Subscribe to an event. Returns an unsubscribe function. */
-  on<K extends keyof Events>(
-    event: K,
-    handler: (data: Events[K]) => void,
-  ): () => void;
+  on<K extends keyof Events>(event: K, handler: (data: Events[K]) => void): () => void;
 
   /** Unsubscribe a handler from an event. */
-  off<K extends keyof Events>(
-    event: K,
-    handler: (data: Events[K]) => void,
-  ): void;
+  off<K extends keyof Events>(event: K, handler: (data: Events[K]) => void): void;
 
   /** Emit an event with data. */
   emit<K extends keyof Events>(event: K, data: Events[K]): void;
@@ -48,10 +42,7 @@ export function createEmitter<
   }
 
   return {
-    on<K extends keyof Events>(
-      event: K,
-      handler: (data: Events[K]) => void,
-    ): () => void {
+    on<K extends keyof Events>(event: K, handler: (data: Events[K]) => void): () => void {
       const set = getSet(event);
       set.add(handler as (data: never) => void);
       return () => {
@@ -59,10 +50,7 @@ export function createEmitter<
       };
     },
 
-    off<K extends keyof Events>(
-      event: K,
-      handler: (data: Events[K]) => void,
-    ): void {
+    off<K extends keyof Events>(event: K, handler: (data: Events[K]) => void): void {
       listeners.get(event)?.delete(handler as (data: never) => void);
     },
 

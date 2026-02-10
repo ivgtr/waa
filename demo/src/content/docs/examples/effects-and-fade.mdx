@@ -1,0 +1,104 @@
+---
+title: エフェクトとフェード
+description: waa-play で audio effect とフェード効果を実装する方法
+---
+
+import { Code } from '@astrojs/starlight/components';
+import EffectsDemo from '../../../components/demo/EffectsDemo.astro';
+import { volumeControlPlayer, volumeControlFn, stereoPanPlayer, stereoPanFn, effectChainPlayer, effectChainFn, fadeInOutPlayer, autoFadePlayer, fadeInOutFn, crossfadePlayer, crossfadeFn } from '../../../snippets/examples/effects-and-fade';
+
+このガイドでは、`nodes`、`fade`、`play` モジュールを使用して、audio effect とフェード効果を実装する方法を説明します。
+
+## デモ
+
+<EffectsDemo locale="ja" />
+
+## 使用モジュール
+
+- **nodes**: Audio node のファクトリー関数（`createGain`、`createPanner`、`chain` など）
+- **fade**: フェードイン/アウト、クロスフェードユーティリティ
+- **play**: コア再生エンジン（`through` オプションで effect chain をルーティング）
+
+## コード例
+
+### 1. ボリューム制御
+
+`createGain()` で GainNode を作成し、`play()` の `through` オプションでルーティングします。`rampGain()` を使用することで、クリックノイズなく滑らかに音量を変更できます。
+
+<Code code={volumeControlPlayer} lang="ts" />
+
+`through` オプションに GainNode を渡すと、`play()` が自動的に音源からゲインノード、そして destination へと接続します。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={volumeControlFn} lang="ts" />
+
+</details>
+
+### 2. ステレオパン
+
+`createPanner()` で StereoPannerNode を作成し、左右のパンを制御できます。値は `-1`（左）から `1`（右）の範囲です。
+
+<Code code={stereoPanPlayer} lang="ts" />
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={stereoPanFn} lang="ts" />
+
+</details>
+
+### 3. Effect Chain
+
+複数の effect を組み合わせて、リッチなサウンド処理を実現できます。`through` に配列でノードを渡すと、自動的にチェーン接続されます。
+
+<Code code={effectChainPlayer} lang="ts" />
+
+`through` オプションを使う場合、`play()` が自動的にノードを接続するため、`chain()` は不要です。`chain()` は `play()` の外でノードグラフを構築する場合に使用します。
+
+<details>
+<summary>関数 API 版</summary>
+
+`chain()` を使って明示的にノードグラフを構築する例です。
+
+<Code code={effectChainFn} lang="ts" />
+
+</details>
+
+### 4. フェードイン/アウト
+
+`fadeIn()` と `fadeOut()` を使用して、滑らかなフェード効果を実現できます。`autoFade()` を使えば、再生開始時と終了時のフェードを自動化できます。
+
+<Code code={fadeInOutPlayer} lang="ts" />
+
+`autoFade()` を使用すると、再生開始時と終了時のフェードを自動的に設定できます。
+
+<Code code={autoFadePlayer} lang="ts" />
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={fadeInOutFn} lang="ts" />
+
+</details>
+
+### 5. DJ クロスフェード
+
+2つのトラック間でクロスフェードを行い、DJ ミックスのようなシームレスな切り替えを実現できます。
+
+<Code code={crossfadePlayer} lang="ts" />
+
+`crossfade()` は、一方の GainNode を 1 から 0 へ、もう一方を 0 から 1 へ同時にフェードします。`curve: "equal-power"` を使用することで、知覚的に均一な音量でクロスフェードが行われます。
+
+<details>
+<summary>関数 API 版</summary>
+
+<Code code={crossfadeFn} lang="ts" />
+
+</details>
+
+## 関連 API
+
+- [WaaPlayer](/waa/api/player/)
+- [関数 API](/waa/api/functions/)

@@ -1,0 +1,63 @@
+---
+title: 节奏变更
+description: 介绍节奏变更和缓冲状态监控模式
+---
+
+import { Code } from '@astrojs/starlight/components';
+import TempoDemo from '../../../../components/demo/TempoDemo.astro';
+import ChunkBufferingDemo from '../../../../components/demo/ChunkBufferingDemo.astro';
+import { tempoChangePlayer, tempoChangeFn, bufferingMonitorPlayer, bufferingMonitorFn } from '../../../../snippets/examples/tempo-and-rhythm';
+
+介绍节奏变更和缓冲状态监控模式。
+
+**使用模块**: `play`, `stretcher`
+
+## 节奏变更演示
+
+基于 WSOLA 的保持音高时间拉伸功能演示。使用节奏滑块实时调整播放速度。
+
+<TempoDemo locale="zh-cn" />
+
+## 分块缓冲演示
+
+用于观察 WSOLA 拉伸引擎分块缓冲机制的演示。实时监控分块处理状态和事件。
+
+<ChunkBufferingDemo locale="zh-cn" />
+
+## 代码示例
+
+### 1. 保持音高的节奏变更
+
+由于 `preservePitch` 默认为 `true`，因此在正常的 `play()` 调用中会自动保持音高。如需常规速度变更（音高也会改变），请明确设置 `preservePitch: false`。
+
+<Code code={tempoChangePlayer} lang="ts" />
+
+WSOLA 算法允许在不改变音高的情况下改变节奏。设置 `preservePitch: true`（默认）将启用基于 WSOLA 的时间拉伸。
+
+<details>
+<summary>函数 API 版</summary>
+
+<Code code={tempoChangeFn} lang="ts" />
+
+</details>
+
+### 2. 监控缓冲状态
+
+由于 WSOLA 处理是异步的，因此在改变节奏时可能会发生缓冲。
+
+<Code code={bufferingMonitorPlayer} lang="ts" />
+
+`buffering` 事件中的 `reason` 为 `"initial"` | `"seek"` | `"tempo-change"` | `"underrun"` 之一。您可以通过 `getSnapshot()` 中的 `stretcher` 字段获取详细状态信息。
+
+<details>
+<summary>函数 API 版</summary>
+
+<Code code={bufferingMonitorFn} lang="ts" />
+
+</details>
+
+## 相关 API
+
+- [WaaPlayer](/waa/zh-cn/api/player/)
+- [函数 API](/waa/zh-cn/api/functions/)
+- [Stretcher](/waa/zh-cn/api/stretcher/)

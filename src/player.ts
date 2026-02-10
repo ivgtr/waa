@@ -1,55 +1,40 @@
-import { createContext, resumeContext, ensureRunning, now } from "./context.js";
+import { getSnapshot, onFrame, subscribeSnapshot, whenEnded, whenPosition } from "./adapters.js";
+import { getBufferInfo, loadBuffer, loadBufferFromBlob, loadBuffers } from "./buffer.js";
+import { createContext, ensureRunning, now, resumeContext } from "./context.js";
+import { autoFade, crossfade, fadeIn, fadeOut } from "./fade.js";
 import {
-  loadBuffer,
-  loadBufferFromBlob,
-  loadBuffers,
-  getBufferInfo,
-} from "./buffer.js";
-import { play } from "./play.js";
-import {
-  createGain as createGainNode,
-  rampGain,
+  chain,
   createAnalyser as createAnalyserNode,
+  createCompressor as createCompressorNode,
+  createFilter as createFilterNode,
+  createGain as createGainNode,
+  createPanner as createPannerNode,
+  disconnectChain,
   getFrequencyData,
   getFrequencyDataByte,
-  createFilter as createFilterNode,
-  createPanner as createPannerNode,
-  createCompressor as createCompressorNode,
-  chain,
-  disconnectChain,
+  rampGain,
 } from "./nodes.js";
-import { extractPeaks, extractPeakPairs, extractRMS } from "./waveform.js";
-import { fadeIn, fadeOut, crossfade, autoFade } from "./fade.js";
-import { createScheduler, createClock } from "./scheduler.js";
-import {
-  createSineBuffer,
-  createNoiseBuffer,
-  createClickBuffer,
-} from "./synth.js";
-import {
-  getSnapshot,
-  subscribeSnapshot,
-  onFrame,
-  whenEnded,
-  whenPosition,
-} from "./adapters.js";
+import { play } from "./play.js";
+import type { Clock, Scheduler } from "./scheduler.js";
+import { createClock, createScheduler } from "./scheduler.js";
+import { createClickBuffer, createNoiseBuffer, createSineBuffer } from "./synth.js";
 
 import type {
-  CreateContextOptions,
-  LoadBufferOptions,
+  AutoFadeOptions,
   BufferInfo,
-  PlayOptions,
+  ClockOptions,
+  CreateContextOptions,
+  CrossfadeOptions,
+  ExtractPeaksOptions,
+  FadeOptions,
+  LoadBufferOptions,
+  PeakPair,
   Playback,
   PlaybackSnapshot,
-  ExtractPeaksOptions,
-  PeakPair,
-  FadeOptions,
-  CrossfadeOptions,
-  AutoFadeOptions,
+  PlayOptions,
   SchedulerOptions,
-  ClockOptions,
 } from "./types.js";
-import type { Scheduler, Clock } from "./scheduler.js";
+import { extractPeakPairs, extractPeaks, extractRMS } from "./waveform.js";
 
 export interface WaaPlayerOptions extends CreateContextOptions {}
 
@@ -58,10 +43,7 @@ export class WaaPlayer {
   private readonly _ownsContext: boolean;
 
   constructor(ctxOrOptions?: AudioContext | WaaPlayerOptions) {
-    if (
-      ctxOrOptions &&
-      typeof (ctxOrOptions as AudioContext).createGain === "function"
-    ) {
+    if (ctxOrOptions && typeof (ctxOrOptions as AudioContext).createGain === "function") {
       this.ctx = ctxOrOptions as AudioContext;
       this._ownsContext = false;
     } else {
@@ -114,10 +96,7 @@ export class WaaPlayer {
     return createGainNode(this.ctx, initialValue);
   }
 
-  createAnalyser(options?: {
-    fftSize?: number;
-    smoothingTimeConstant?: number;
-  }): AnalyserNode {
+  createAnalyser(options?: { fftSize?: number; smoothingTimeConstant?: number }): AnalyserNode {
     return createAnalyserNode(this.ctx, options);
   }
 
@@ -170,17 +149,11 @@ export class WaaPlayer {
     return extractPeaks(buffer, options);
   }
 
-  extractPeakPairs(
-    buffer: AudioBuffer,
-    options?: ExtractPeaksOptions,
-  ): PeakPair[] {
+  extractPeakPairs(buffer: AudioBuffer, options?: ExtractPeaksOptions): PeakPair[] {
     return extractPeakPairs(buffer, options);
   }
 
-  extractRMS(
-    buffer: AudioBuffer,
-    options?: ExtractPeaksOptions & { channel?: number },
-  ): number[] {
+  extractRMS(buffer: AudioBuffer, options?: ExtractPeaksOptions & { channel?: number }): number[] {
     return extractRMS(buffer, options);
   }
 
@@ -194,19 +167,11 @@ export class WaaPlayer {
     fadeOut(gain, options);
   }
 
-  crossfade(
-    gainA: GainNode,
-    gainB: GainNode,
-    options?: CrossfadeOptions,
-  ): void {
+  crossfade(gainA: GainNode, gainB: GainNode, options?: CrossfadeOptions): void {
     crossfade(gainA, gainB, options);
   }
 
-  autoFade(
-    playback: Playback,
-    gain: GainNode,
-    options?: AutoFadeOptions,
-  ): () => void {
+  autoFade(playback: Playback, gain: GainNode, options?: AutoFadeOptions): () => void {
     return autoFade(playback, gain, options);
   }
 
@@ -244,10 +209,7 @@ export class WaaPlayer {
     return subscribeSnapshot(playback, callback);
   }
 
-  onFrame(
-    playback: Playback,
-    callback: (snapshot: PlaybackSnapshot) => void,
-  ): () => void {
+  onFrame(playback: Playback, callback: (snapshot: PlaybackSnapshot) => void): () => void {
     return onFrame(playback, callback);
   }
 

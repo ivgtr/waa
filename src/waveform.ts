@@ -4,17 +4,18 @@
 
 import type { ExtractPeaksOptions, PeakPair } from "./types.js";
 
+function calcBlockSize(dataLength: number, resolution: number): number {
+  return Math.max(1, Math.floor(dataLength / resolution));
+}
+
 /**
  * Extract normalised peak amplitude values from an `AudioBuffer`.
  * Returns an array of numbers in the range `[0, 1]`.
  */
-export function extractPeaks(
-  buffer: AudioBuffer,
-  options?: ExtractPeaksOptions,
-): number[] {
+export function extractPeaks(buffer: AudioBuffer, options?: ExtractPeaksOptions): number[] {
   const { resolution = 200, channel = 0 } = options ?? {};
   const data = buffer.getChannelData(channel);
-  const blockSize = Math.floor(data.length / resolution);
+  const blockSize = calcBlockSize(data.length, resolution);
   const peaks: number[] = [];
 
   for (let i = 0; i < resolution; i++) {
@@ -34,13 +35,10 @@ export function extractPeaks(
 /**
  * Extract min/max peak pairs for detailed waveform rendering.
  */
-export function extractPeakPairs(
-  buffer: AudioBuffer,
-  options?: ExtractPeaksOptions,
-): PeakPair[] {
+export function extractPeakPairs(buffer: AudioBuffer, options?: ExtractPeaksOptions): PeakPair[] {
   const { resolution = 200, channel = 0 } = options ?? {};
   const data = buffer.getChannelData(channel);
-  const blockSize = Math.floor(data.length / resolution);
+  const blockSize = calcBlockSize(data.length, resolution);
   const pairs: PeakPair[] = [];
 
   for (let i = 0; i < resolution; i++) {
@@ -72,6 +70,9 @@ export function extractRMS(
   const { resolution = 200, channel = 0 } = options ?? {};
 
   if (channel === -1) {
+    if (buffer.numberOfChannels === 0) {
+      return [];
+    }
     // Average across all channels.
     const allChannels: number[][] = [];
     for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
@@ -87,18 +88,19 @@ export function extractRMS(
   }
 
   const data = buffer.getChannelData(channel);
-  const blockSize = Math.floor(data.length / resolution);
+  const blockSize = calcBlockSize(data.length, resolution);
   const rms: number[] = [];
 
   for (let i = 0; i < resolution; i++) {
     const start = i * blockSize;
     const end = Math.min(start + blockSize, data.length);
     let sumSq = 0;
+    const count = end - start;
     for (let j = start; j < end; j++) {
       const s = data[j]!;
       sumSq += s * s;
     }
-    rms.push(Math.sqrt(sumSq / (end - start)));
+    rms.push(count > 0 ? Math.sqrt(sumSq / count) : 0);
   }
 
   return rms;

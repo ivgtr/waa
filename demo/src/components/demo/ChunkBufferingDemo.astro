@@ -1,0 +1,293 @@
+---
+import { t } from '../../i18n/translations';
+import type { Locale } from '../../i18n/translations';
+import SoundSourceCard from './SoundSourceCard.astro';
+import TransportButtons from './TransportButtons.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<div
+  class="demo-wrapper not-content"
+  id="chunk-buffering-demo"
+  data-i18n-pause={t(locale, 'playback.pause')}
+  data-i18n-play={t(locale, 'playback.play')}
+  data-i18n-loading={t(locale, 'source.loading')}
+  data-i18n-load-failed={t(locale, 'source.load-failed')}
+  data-i18n-load-file={t(locale, 'source.load-file')}
+  data-i18n-buffering={t(locale, 'stretcher.buffering')}
+>
+  <SoundSourceCard
+    locale={locale}
+    prefix="cb-"
+    description={t(locale, 'demo.cb.source-desc')}
+    durMin={1}
+    durMax={10}
+    durDefault={5}
+  />
+
+  <!-- Waveform + Chunk Strip -->
+  <section class="card" id="cb-waveform-section" hidden>
+    <h2>{t(locale, 'waveform.title')}</h2>
+    <div class="waveform-container">
+      <div id="cb-waveform-buffer-bar" class="waveform-buffer-bar"></div>
+      <canvas id="cb-waveform-canvas"></canvas>
+      <div id="cb-waveform-cursor" class="waveform-cursor"></div>
+    </div>
+    <div id="cb-chunk-strip" class="chunk-strip" hidden>
+      <div id="cb-chunk-strip-blocks" class="chunk-strip-blocks"></div>
+    </div>
+    <div class="time-display">
+      <span id="cb-time-current">0:00.0</span>
+      <span id="cb-time-duration">0:00.0</span>
+    </div>
+  </section>
+
+  <!-- Playback + Tempo Controls -->
+  <section class="card" id="cb-playback-section" hidden>
+    <h2>{t(locale, 'demo.cb.title')}</h2>
+    <div class="playback-controls">
+      <TransportButtons locale={locale} prefix="cb-" />
+      <div class="control-params">
+        <label class="control-label">
+          {t(locale, 'playback.speed')}
+          <select id="cb-speed">
+            <option value="0.5">0.5x</option>
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="cb-legend">
+      <h3>{t(locale, 'demo.cb.legend')}</h3>
+      <div class="cb-legend-grid">
+        <div class="cb-legend-item">
+          <span class="cb-legend-swatch cb-swatch-pending"></span>
+          {t(locale, 'demo.cb.pending')}
+        </div>
+        <div class="cb-legend-item">
+          <span class="cb-legend-swatch cb-swatch-queued"></span>
+          {t(locale, 'demo.cb.queued')}
+        </div>
+        <div class="cb-legend-item">
+          <span class="cb-legend-swatch cb-swatch-converting"></span>
+          {t(locale, 'demo.cb.converting')}
+        </div>
+        <div class="cb-legend-item">
+          <span class="cb-legend-swatch cb-swatch-ready"></span>
+          {t(locale, 'demo.cb.ready')}
+        </div>
+        <div class="cb-legend-item">
+          <span class="cb-legend-swatch cb-swatch-evicted"></span>
+          {t(locale, 'demo.cb.evicted')}
+        </div>
+        <div class="cb-legend-item">
+          <span class="cb-legend-swatch cb-swatch-playhead"></span>
+          {t(locale, 'demo.cb.playhead')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Stretcher Status -->
+    <div id="cb-stretcher-status" class="stretcher-status" hidden>
+      <div class="stretcher-status-header">
+        <span class="stretcher-status-title">{t(locale, 'stretcher.title')}</span>
+        <span id="cb-stretcher-buffering" class="stretcher-buffering" hidden>
+          <span class="spinner spinner-sm"></span>
+          {t(locale, 'stretcher.buffering')}
+        </span>
+      </div>
+      <div class="stretcher-progress">
+        <div id="cb-stretcher-progress-fill" class="stretcher-progress-fill" style="width: 0%"></div>
+      </div>
+      <div class="stretcher-info">
+        <span id="cb-buffer-health" class="buffer-health buffer-empty"></span>
+        <span id="cb-stretcher-detail" class="stretcher-detail"></span>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="cb-event-log">
+      <h3>{t(locale, 'demo.cb.event-log')}</h3>
+      <div id="cb-event-log-entries" class="cb-event-log-entries"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+  import { createDemoController } from '../../demo/demo-controller';
+  import { $ } from '../../demo/demo-utils';
+  import type { StretcherSnapshotExtension } from 'waa';
+
+  const speedSelect = $<HTMLSelectElement>('cb-speed');
+
+  const waveformContainer = document.querySelector('#chunk-buffering-demo .waveform-container');
+  const waveformBufferBar = $('cb-waveform-buffer-bar');
+  const chunkStrip = $('cb-chunk-strip');
+  const chunkStripBlocks = $('cb-chunk-strip-blocks');
+  const stretcherStatus = $('cb-stretcher-status');
+  const stretcherProgressFill = $('cb-stretcher-progress-fill');
+  const stretcherBuffering = $('cb-stretcher-buffering');
+  const bufferHealthDot = $('cb-buffer-health');
+  const stretcherDetail = $('cb-stretcher-detail');
+  const eventLogEntries = $('cb-event-log-entries');
+
+  let prevTotalChunks = 0;
+
+  // ── Event log ──────────────────────────────────────────────────
+
+  const MAX_LOG_ENTRIES = 8;
+
+  function addLogEntry(message: string) {
+    const entry = document.createElement('div');
+    entry.className = 'cb-log-entry cb-log-entry-new';
+    const now = new Date();
+    const ts = `${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${Math.floor(now.getMilliseconds() / 100)}`;
+    entry.innerHTML = `<span class="cb-log-timestamp">${ts}</span><span class="cb-log-message">${message}</span>`;
+    eventLogEntries.prepend(entry);
+    while (eventLogEntries.children.length > MAX_LOG_ENTRIES) {
+      eventLogEntries.lastElementChild?.remove();
+    }
+    entry.addEventListener('animationend', () => entry.classList.remove('cb-log-entry-new'), { once: true });
+  }
+
+  // ── Event detection from snapshot diff ────────────────────────
+
+  let prevBuffering: boolean | undefined;
+  let prevBufferHealth: string | undefined;
+  let prevChunkIndex: number | undefined;
+
+  function detectEvents(snap: StretcherSnapshotExtension) {
+    if (prevBuffering !== undefined && prevBuffering !== snap.buffering) {
+      addLogEntry(snap.buffering ? 'Buffering started' : 'Buffering ended');
+    }
+    prevBuffering = snap.buffering;
+
+    if (prevBufferHealth !== undefined && prevBufferHealth !== snap.bufferHealth) {
+      addLogEntry(`Buffer health: ${prevBufferHealth} → ${snap.bufferHealth}`);
+    }
+    prevBufferHealth = snap.bufferHealth;
+
+    if (prevChunkIndex !== undefined && prevChunkIndex !== snap.currentChunkIndex) {
+      addLogEntry(`Chunk transition: #${prevChunkIndex} → #${snap.currentChunkIndex}`);
+    }
+    prevChunkIndex = snap.currentChunkIndex;
+  }
+
+  // ── Stretcher UI ──────────────────────────────────────────────
+
+  function updateStretcherUI(snap: StretcherSnapshotExtension | undefined) {
+    if (!snap) return;
+    stretcherStatus.hidden = false;
+    chunkStrip.hidden = false;
+    stretcherProgressFill.style.width = `${(snap.windowConversionProgress * 100).toFixed(1)}%`;
+    bufferHealthDot.className = `buffer-health buffer-${snap.bufferHealth}`;
+    const pct = (snap.windowConversionProgress * 100).toFixed(0);
+    stretcherDetail.textContent = `window: ${pct}% | ahead: ${snap.aheadSeconds.toFixed(1)}s`;
+    stretcherBuffering.hidden = !snap.buffering;
+    renderChunkStrip(snap);
+    detectEvents(snap);
+  }
+
+  function renderChunkStrip(snap: StretcherSnapshotExtension) {
+    const { chunkStates, currentChunkIndex: playhead, activeWindowStart, activeWindowEnd, totalChunks } = snap;
+    if (totalChunks !== prevTotalChunks) {
+      prevTotalChunks = totalChunks;
+      chunkStripBlocks.innerHTML = '';
+      waveformBufferBar.innerHTML = '';
+      for (let i = 0; i < totalChunks; i++) {
+        const block = document.createElement('div');
+        block.className = 'chunk-block chunk-pending';
+        chunkStripBlocks.appendChild(block);
+        const wbBlock = document.createElement('div');
+        wbBlock.className = 'waveform-buffer-block wb-pending';
+        waveformBufferBar.appendChild(wbBlock);
+      }
+    }
+    const blocks = chunkStripBlocks.children;
+    const wbBlocks = waveformBufferBar.children;
+    for (let i = 0; i < blocks.length; i++) {
+      const state = chunkStates[i] ?? 'pending';
+      let cls = `chunk-block chunk-${state}`;
+      if (i >= activeWindowStart && i <= activeWindowEnd) cls += ' chunk-in-window';
+      if (i === playhead) cls += ' chunk-playhead';
+      if (blocks[i]!.className !== cls) blocks[i]!.className = cls;
+      const wbCls = `waveform-buffer-block wb-${state}`;
+      if (wbBlocks[i] && wbBlocks[i]!.className !== wbCls) wbBlocks[i]!.className = wbCls;
+    }
+  }
+
+  // ── Controller ────────────────────────────────────────────────
+
+  function resetEventState() {
+    prevBuffering = undefined;
+    prevBufferHealth = undefined;
+    prevChunkIndex = undefined;
+  }
+
+  const ctrl = createDemoController({
+    wrapperId: 'chunk-buffering-demo',
+    prefix: 'cb-',
+    initNodes(player) {
+      const gainNode = player.createGain(0.8);
+      player.chain(gainNode, player.ctx.destination);
+      return gainNode;
+    },
+    onBufferLoaded() {
+      prevTotalChunks = 0;
+      resetEventState();
+      eventLogEntries.innerHTML = '';
+      stretcherStatus.hidden = true;
+      chunkStrip.hidden = true;
+      waveformBufferBar.innerHTML = '';
+    },
+    getPlayOptions() {
+      return {
+        playbackRate: Number(speedSelect.value),
+        preservePitch: true,
+      };
+    },
+    onFrame(snapshot) {
+      updateStretcherUI(snapshot.stretcher);
+    },
+    onEnded() {
+      stretcherStatus.hidden = true;
+      chunkStrip.hidden = true;
+    },
+    onStop() {
+      stretcherStatus.hidden = true;
+      chunkStrip.hidden = true;
+    },
+  });
+
+  // ── Tempo slider ──────────────────────────────────────────────
+
+  speedSelect.addEventListener('change', () => {
+    const v = Number(speedSelect.value);
+    if (ctrl.currentPlayback) ctrl.currentPlayback.setPlaybackRate(v);
+    addLogEntry(`Tempo → ${v}x`);
+  });
+
+  // ── Seek logging ──────────────────────────────────────────────
+
+  waveformContainer?.addEventListener('click', () => {
+    if (ctrl.currentPlayback) {
+      const snap = ctrl.currentPlayback.getSnapshot();
+      addLogEntry(`Seek → ${snap.position.toFixed(1)}s`);
+    }
+  });
+</script>
+
+<style is:global>
+  @import '../../demo/style.css';
+</style>

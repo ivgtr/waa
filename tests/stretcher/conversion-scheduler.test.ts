@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createConversionScheduler } from "../../src/stretcher/conversion-scheduler";
 import type { ChunkInfo, WorkerManager } from "../../src/stretcher/types";
 
@@ -68,13 +68,7 @@ describe("createConversionScheduler", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks,
-      wm,
-      extractData,
-      44100,
-      1.5,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.5);
 
     scheduler.start(0);
 
@@ -90,13 +84,7 @@ describe("createConversionScheduler", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks,
-      wm,
-      extractData,
-      44100,
-      1.0,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
 
     scheduler.start(0);
 
@@ -122,14 +110,9 @@ describe("createConversionScheduler", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks,
-      wm,
-      extractData,
-      44100,
-      1.0,
-      { cancelDistanceThreshold: 2 },
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0, {
+      cancelDistanceThreshold: 2,
+    });
 
     scheduler.start(0);
     expect(wm.isBusy()).toBe(true);
@@ -146,13 +129,7 @@ describe("createConversionScheduler", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks,
-      wm,
-      extractData,
-      44100,
-      1.0,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
 
     scheduler.start(0);
 
@@ -166,7 +143,9 @@ describe("createConversionScheduler", () => {
 
     // All chunks should be reset
     for (const chunk of chunks) {
-      expect(chunk.state === "pending" || chunk.state === "queued" || chunk.state === "converting").toBe(true);
+      expect(
+        chunk.state === "pending" || chunk.state === "queued" || chunk.state === "converting",
+      ).toBe(true);
     }
 
     scheduler.dispose();
@@ -177,13 +156,7 @@ describe("createConversionScheduler", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks,
-      wm,
-      extractData,
-      44100,
-      1.0,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
 
     scheduler.start(0);
 
@@ -217,14 +190,10 @@ describe("createConversionScheduler", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks,
-      wm,
-      extractData,
-      44100,
-      1.0,
-      { keepAheadChunks: 5, keepBehindChunks: 3 },
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0, {
+      keepAheadChunks: 5,
+      keepBehindChunks: 3,
+    });
 
     scheduler.start(0);
 
@@ -247,14 +216,10 @@ describe("createConversionScheduler", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks,
-      wm,
-      extractData,
-      44100,
-      1.0,
-      { keepAheadChunks: 5, keepBehindChunks: 3 },
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0, {
+      keepAheadChunks: 5,
+      keepBehindChunks: 3,
+    });
 
     scheduler.start(10);
 
@@ -289,14 +254,10 @@ describe("createConversionScheduler", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks,
-      wm,
-      extractData,
-      44100,
-      1.0,
-      { keepAheadChunks: 3, keepBehindChunks: 2 },
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0, {
+      keepAheadChunks: 3,
+      keepBehindChunks: 2,
+    });
 
     scheduler.start(5);
 
@@ -332,14 +293,10 @@ describe("createConversionScheduler", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks,
-      wm,
-      extractData,
-      44100,
-      1.0,
-      { keepAheadChunks: 3, keepBehindChunks: 2 },
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0, {
+      keepAheadChunks: 3,
+      keepBehindChunks: 2,
+    });
 
     scheduler.start(5);
 

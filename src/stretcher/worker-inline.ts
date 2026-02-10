@@ -5,11 +5,7 @@
 // for execution inside a Web Worker. The logic mirrors wsola.ts.
 // ---------------------------------------------------------------------------
 
-import {
-  WSOLA_FRAME_SIZE,
-  WSOLA_HOP_SIZE,
-  WSOLA_TOLERANCE,
-} from "./constants.js";
+import { WSOLA_FRAME_SIZE, WSOLA_HOP_SIZE, WSOLA_TOLERANCE } from "./constants.js";
 
 function getWorkerCode(): string {
   // Embed constants directly into the worker code
@@ -64,6 +60,14 @@ function wsolaTimeStretch(channels, tempo, sampleRate) {
   var inputLength = channels[0].length;
   if (inputLength === 0) {
     return { output: channels.map(function() { return new Float32Array(0); }), length: 0 };
+  }
+
+  var TEMPO_IDENTITY_EPSILON = 0.001;
+  if (Math.abs(tempo - 1.0) < TEMPO_IDENTITY_EPSILON) {
+    return {
+      output: channels.map(function(ch) { return new Float32Array(ch); }),
+      length: inputLength
+    };
   }
 
   var synthesisHop = HOP_SIZE;
@@ -133,7 +137,7 @@ function wsolaTimeStretch(channels, tempo, sampleRate) {
         if (outIdx >= estimatedOutputLength) break;
         var sample = input[inIdx];
         output[outIdx] += sample * windowFunc[i];
-        prevFrame[i] = sample;
+        prevFrame[i] = sample * windowFunc[i];
       }
     }
 

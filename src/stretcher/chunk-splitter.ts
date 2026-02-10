@@ -60,9 +60,7 @@ export function splitIntoChunks(
 
     // Overlap regions
     const overlapBefore = isFirst ? 0 : Math.min(overlapSamples, start);
-    const overlapAfter = isLast
-      ? 0
-      : Math.min(overlapSamples, totalSamples - nominalEnd);
+    const overlapAfter = isLast ? 0 : Math.min(overlapSamples, totalSamples - nominalEnd);
 
     // Actual input range includes overlap
     const inputStart = start - overlapBefore;
@@ -91,19 +89,14 @@ export function splitIntoChunks(
 /**
  * Extract channel data for a specific chunk from an AudioBuffer.
  */
-export function extractChunkData(
-  buffer: AudioBuffer,
-  chunk: ChunkInfo,
-): Float32Array[] {
+export function extractChunkData(buffer: AudioBuffer, chunk: ChunkInfo): Float32Array[] {
   const channels: Float32Array[] = [];
   const length = chunk.inputEndSample - chunk.inputStartSample;
 
   for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
     const fullChannel = buffer.getChannelData(ch);
     const chunkData = new Float32Array(length);
-    chunkData.set(
-      fullChannel.subarray(chunk.inputStartSample, chunk.inputEndSample),
-    );
+    chunkData.set(fullChannel.subarray(chunk.inputStartSample, chunk.inputEndSample));
     channels.push(chunkData);
   }
 
@@ -113,10 +106,7 @@ export function extractChunkData(
 /**
  * Get the chunk index that contains the given sample position.
  */
-export function getChunkIndexForSample(
-  chunks: ChunkInfo[],
-  sample: number,
-): number {
+export function getChunkIndexForSample(chunks: ChunkInfo[], sample: number): number {
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i]!;
     const nominalStart = chunk.inputStartSample + chunk.overlapBefore;

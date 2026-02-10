@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMainThreadProcessor } from "../../src/stretcher/main-thread-processor";
 import type { WorkerResponse } from "../../src/stretcher/types";
 
@@ -144,5 +144,85 @@ describe("createMainThreadProcessor", () => {
 
     expect(onResult.mock.calls[0]![0]!.chunkIndex).toBe(0);
     expect(onResult.mock.calls[1]![0]!.chunkIndex).toBe(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // MTP: postTimes / cancelledChunks ライフサイクル
+  // -----------------------------------------------------------------------
+
+  describe("MTP: postTimes / cancelledChunks ライフサイクル", () => {
+    it("MTP-a: postTimes persist after result delivery", async () => {
+      const proc = createMainThreadProcessor(onResult, onError);
+      const input = [new Float32Array(4096).fill(0.5)];
+      proc.postConvert(0, input, 1.0, 44100);
+
+      // postTime should be set immediately
+      expect(proc.getPostTimeForChunk(0)).toBeTypeOf("number");
+
+      // Wait for result
+      await vi.waitFor(() => {
+        expect(onResult).toHaveBeenCalledTimes(1);
+      });
+
+      // postTimes should still contain the entry (no cleanup on result)
+      expect(proc.getPostTimeForChunk(0)).toBeTypeOf("number");
+      expect(proc.getLastPostTime()).toBeTypeOf("number");
+    });
+
+    it("MTP-b: cancelChunk then re-postConvert same index yields normal result", async () => {
+      const proc = createMainThreadProcessor(onResult, onError);
+      const input = [new Float32Array(4096).fill(0.5)];
+
+      // First conversion → cancel
+      proc.postConvert(0, input, 1.0, 44100);
+      proc.cancelChunk(0);
+
+      // Wait for cancelled result
+      await vi.waitFor(() => {
+        expect(onResult).toHaveBeenCalledTimes(1);
+      });
+      expect(onResult.mock.calls[0]![0]!.type).toBe("cancelled");
+
+      // Re-post same index → should produce normal result
+      proc.postConvert(0, input, 1.0, 44100);
+
+      await vi.waitFor(() => {
+        expect(onResult).toHaveBeenCalledTimes(2);
+      });
+      expect(onResult.mock.calls[1]![0]!.type).toBe("result");
+      expect(onResult.mock.calls[1]![0]!.chunkIndex).toBe(0);
+    });
+
+    it("MTP-c: terminate clears postTimes and getLastPostTime", () => {
+      const proc = createMainThreadProcessor(onResult, onError);
+      const input = [new Float32Array(4096).fill(0.5)];
+      proc.postConvert(0, input, 1.0, 44100);
+
+      expect(proc.getPostTimeForChunk(0)).toBeTypeOf("number");
+      expect(proc.getLastPostTime()).toBeTypeOf("number");
+
+      proc.terminate();
+
+      expect(proc.getPostTimeForChunk(0)).toBeNull();
+      expect(proc.getLastPostTime()).toBeNull();
+    });
+
+    it("MTP-d: terminate before setTimeout fires prevents callbacks", async () => {
+      const proc = createMainThreadProcessor(onResult, onError);
+      const input = [new Float32Array(4096).fill(0.5)];
+
+      // Post conversion (setTimeout(0) scheduled)
+      proc.postConvert(0, input, 1.0, 44100);
+
+      // Terminate immediately before the setTimeout fires
+      proc.terminate();
+
+      // Wait to ensure the setTimeout would have fired
+      await new Promise((r) => setTimeout(r, 50));
+
+      // No callbacks should have been called
+      expect(onResult).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+    });
   });
 });

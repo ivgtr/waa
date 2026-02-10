@@ -97,6 +97,15 @@ export function wsolaTimeStretch(
     return { output: channels.map(() => new Float32Array(0)), length: 0 };
   }
 
+  // At tempo≈1.0 (identity), skip WSOLA to avoid NCC search artifacts
+  const TEMPO_IDENTITY_EPSILON = 0.001;
+  if (Math.abs(tempo - 1.0) < TEMPO_IDENTITY_EPSILON) {
+    return {
+      output: channels.map((ch) => new Float32Array(ch)),
+      length: inputLength,
+    };
+  }
+
   // WSOLA: synthesisHop is fixed, analysisHop varies with tempo
   const synthesisHop = hopSize;
   const analysisHop = Math.round(hopSize * tempo);
@@ -112,9 +121,7 @@ export function wsolaTimeStretch(
   }
 
   const estimatedOutputLength = (numFrames - 1) * synthesisHop + frameSize;
-  const outputChannels = channels.map(
-    () => new Float32Array(estimatedOutputLength),
-  );
+  const outputChannels = channels.map(() => new Float32Array(estimatedOutputLength));
   const windowFunc = createHannWindow(frameSize);
 
   // Normalization buffer for overlap-add
@@ -149,16 +156,10 @@ export function wsolaTimeStretch(
         const overlapStart = frameSize - synthesisHop;
         const overlapSize = Math.min(synthesisHop, frameSize - overlapStart);
 
-        const refSlice = refChannel.subarray(
-          overlapStart,
-          overlapStart + overlapSize,
-        );
+        const refSlice = refChannel.subarray(overlapStart, overlapStart + overlapSize);
 
         // Search buffer: extract the region to search in
-        const searchSlice = inputChannel.subarray(
-          searchStart,
-          searchEnd + overlapSize,
-        );
+        const searchSlice = inputChannel.subarray(searchStart, searchEnd + overlapSize);
 
         const bestOffset = findBestOffset(
           refSlice,
@@ -185,7 +186,7 @@ export function wsolaTimeStretch(
 
         const sample = input[inIdx]!;
         output[outIdx]! += sample * windowFunc[i]!;
-        prevFrame[i] = sample;
+        prevFrame[i] = sample * windowFunc[i]!;
       }
     }
 
@@ -213,9 +214,7 @@ export function wsolaTimeStretch(
   }
 
   // Trim output to actual length
-  const trimmedOutput = outputChannels.map((ch) =>
-    ch.subarray(0, actualOutputLength),
-  );
+  const trimmedOutput = outputChannels.map((ch) => ch.subarray(0, actualOutputLength));
 
   return { output: trimmedOutput, length: actualOutputLength };
 }

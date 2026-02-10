@@ -3,14 +3,24 @@
 // ---------------------------------------------------------------------------
 
 import { createEmitter } from "../emitter.js";
-import { CHUNK_DURATION_SEC, OVERLAP_SEC, CROSSFADE_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE, LOOKAHEAD_THRESHOLD_SEC } from "./constants.js";
-import { splitIntoChunks, extractChunkData, getChunkIndexForTime } from "./chunk-splitter.js";
-import { createWorkerManager } from "./worker-manager.js";
-import { createMainThreadProcessor } from "./main-thread-processor.js";
-import { createConversionScheduler } from "./conversion-scheduler.js";
-import { createChunkPlayer } from "./chunk-player.js";
 import { createBufferMonitor } from "./buffer-monitor.js";
+import { createChunkPlayer } from "./chunk-player.js";
+import { extractChunkData, getChunkIndexForTime, splitIntoChunks } from "./chunk-splitter.js";
+import {
+  CHUNK_DURATION_SEC,
+  CROSSFADE_SEC,
+  KEEP_AHEAD_CHUNKS,
+  KEEP_AHEAD_SECONDS,
+  KEEP_BEHIND_CHUNKS,
+  KEEP_BEHIND_SECONDS,
+  OVERLAP_SEC,
+  PROACTIVE_SCHEDULE_THRESHOLD_SEC,
+  WORKER_POOL_SIZE,
+} from "./constants.js";
 import { createConversionEstimator } from "./conversion-estimator.js";
+import { createConversionScheduler } from "./conversion-scheduler.js";
+import { createMainThreadProcessor } from "./main-thread-processor.js";
+import { calcPositionInOriginalBuffer } from "./position-calc.js";
 import type {
   ChunkInfo,
   StretcherEngine,
@@ -22,11 +32,12 @@ import type {
   WorkerManager,
   WorkerResponse,
 } from "./types.js";
+import { createWorkerManager } from "./worker-manager.js";
 
 /**
  * Trim overlap regions from WSOLA output so adjacent chunks don't double-play.
  */
-function trimOverlap(
+export function trimOverlap(
   outputData: Float32Array[],
   outputLength: number,
   chunk: ChunkInfo,
@@ -38,7 +49,7 @@ function trimOverlap(
   }
 
   const ratio = outputLength / inputLength;
-  const crossfadeKeep = Math.round(CROSSFADE_SEC * sampleRate);
+  const crossfadeKeep = Math.round(CROSSFADE_SEC * sampleRate * Math.min(1, ratio));
   const overlapBeforeOutput = Math.round(chunk.overlapBefore * ratio);
   const overlapAfterOutput = Math.round(chunk.overlapAfter * ratio);
   const keepBefore = chunk.overlapBefore > 0 ? Math.min(crossfadeKeep, overlapBeforeOutput) : 0;
@@ -51,7 +62,7 @@ function trimOverlap(
   }
 
   return {
-    data: outputData.map(ch => ch.slice(trimStart, trimStart + newLength)),
+    data: outputData.map((ch) => ch.slice(trimStart, trimStart + newLength)),
     length: newLength,
   };
 }
@@ -88,18 +99,19 @@ export function createStretcherEngine(
   let bufferingStartTime = 0;
   let currentChunkIndex = 0;
   let bufferingResumePosition: number | null = null;
+  let expectedTransitionFrom: number | null = null;
+  let nextChunkScheduledIndex: number | null = null;
+  let pendingTempoChange = false;
 
   // Memory management window
   const keepAhead = Math.max(KEEP_AHEAD_CHUNKS, Math.ceil(KEEP_AHEAD_SECONDS / CHUNK_DURATION_SEC));
-  const keepBehind = Math.max(KEEP_BEHIND_CHUNKS, Math.ceil(KEEP_BEHIND_SECONDS / CHUNK_DURATION_SEC));
+  const keepBehind = Math.max(
+    KEEP_BEHIND_CHUNKS,
+    Math.ceil(KEEP_BEHIND_SECONDS / CHUNK_DURATION_SEC),
+  );
 
   // Split buffer into chunks
-  const chunks = splitIntoChunks(
-    buffer.length,
-    sampleRate,
-    CHUNK_DURATION_SEC,
-    OVERLAP_SEC,
-  );
+  const chunks = splitIntoChunks(buffer.length, sampleRate, CHUNK_DURATION_SEC, OVERLAP_SEC);
 
   // Estimator
   const estimator = createConversionEstimator();
@@ -124,11 +136,7 @@ export function createStretcherEngine(
           chunk,
           sampleRate,
         );
-        schedulerInternal._handleResult(
-          response.chunkIndex,
-          trimmed.data,
-          trimmed.length,
-        );
+        schedulerInternal._handleResult(response.chunkIndex, trimmed.data, trimmed.length);
       }
     } else if (response.type === "cancelled") {
       const chunk = chunks[response.chunkIndex];
@@ -142,10 +150,7 @@ export function createStretcherEngine(
   function handleWorkerError(response: WorkerResponse): void {
     if (disposed) return;
     if (response.type === "error") {
-      schedulerInternal._handleError(
-        response.chunkIndex,
-        response.error ?? "Unknown error",
-      );
+      schedulerInternal._handleError(response.chunkIndex, response.error ?? "Unknown error");
     }
   }
 
@@ -190,30 +195,36 @@ export function createStretcherEngine(
     advanceToNextChunk();
   });
 
+  function tryScheduleNext(nextIdx: number): void {
+    if (nextChunkScheduledIndex === nextIdx) return;
+    if (nextIdx >= chunks.length) return;
+    const nextChunk = chunks[nextIdx];
+    if (!nextChunk || nextChunk.state !== "ready" || !nextChunk.outputBuffer) return;
+    if (chunkPlayer.hasNextScheduled()) return;
+    const curChunk = chunks[currentChunkIndex];
+    const curOutputDuration = curChunk ? curChunk.outputLength / sampleRate : 0;
+    const elapsed = chunkPlayer.getCurrentPosition();
+    const remaining = curOutputDuration - elapsed;
+    if (remaining <= 0) return;
+    const audioBuffer = createAudioBufferFromChunk(nextChunk);
+    if (!audioBuffer) return;
+    const startTime = ctx.currentTime + remaining;
+    expectedTransitionFrom = currentChunkIndex;
+    chunkPlayer.scheduleNext(audioBuffer, startTime);
+    nextChunkScheduledIndex = nextIdx;
+  }
+
   chunkPlayer.setOnNeedNext(() => {
     if (disposed) return;
-    const nextIdx = currentChunkIndex + 1;
-    if (nextIdx < chunks.length) {
-      const nextChunk = chunks[nextIdx]!;
-      if (nextChunk.state === "ready" && nextChunk.outputBuffer) {
-        const audioBuffer = createAudioBufferFromChunk(nextChunk);
-        if (audioBuffer) {
-          const curChunk = chunks[currentChunkIndex];
-          const curOutputDuration = curChunk
-            ? curChunk.outputLength / sampleRate
-            : 0;
-          const elapsed = chunkPlayer.getCurrentPosition();
-          const remaining = curOutputDuration - elapsed;
-          const startTime = ctx.currentTime + Math.max(0, remaining);
-          chunkPlayer.scheduleNext(audioBuffer, startTime);
-        }
-      }
-    }
+    tryScheduleNext(currentChunkIndex + 1);
   });
 
   chunkPlayer.setOnTransition(() => {
     if (disposed) return;
-    // scheduleNext の transition 完了: chunk N+1 が current に昇格した
+    if (expectedTransitionFrom !== null && currentChunkIndex !== expectedTransitionFrom) {
+      return;
+    }
+    nextChunkScheduledIndex = null;
     const nextIdx = currentChunkIndex + 1;
     if (nextIdx < chunks.length) {
       currentChunkIndex = nextIdx;
@@ -240,24 +251,13 @@ export function createStretcherEngine(
 
     // Proactively schedule next chunk when it becomes ready (background tab resilience)
     if (phase === "playing" && chunkIndex === currentChunkIndex + 1) {
-      if (!chunkPlayer.hasNextScheduled()) {
-        const curChunk = chunks[currentChunkIndex];
-        const curOutputDuration = curChunk
-          ? curChunk.outputLength / sampleRate
-          : 0;
-        const elapsed = chunkPlayer.getCurrentPosition();
-        const remaining = curOutputDuration - elapsed;
+      const curChunk = chunks[currentChunkIndex];
+      const curOutputDuration = curChunk ? curChunk.outputLength / sampleRate : 0;
+      const elapsed = chunkPlayer.getCurrentPosition();
+      const remaining = curOutputDuration - elapsed;
 
-        if (remaining <= LOOKAHEAD_THRESHOLD_SEC) {
-          const nextChunk = chunks[chunkIndex];
-          if (nextChunk && nextChunk.outputBuffer) {
-            const audioBuffer = createAudioBufferFromChunk(nextChunk);
-            if (audioBuffer) {
-              const startTime = ctx.currentTime + Math.max(0, remaining);
-              chunkPlayer.scheduleNext(audioBuffer, startTime);
-            }
-          }
-        }
+      if (remaining <= PROACTIVE_SCHEDULE_THRESHOLD_SEC) {
+        tryScheduleNext(chunkIndex);
       }
     }
 
@@ -285,11 +285,7 @@ export function createStretcherEngine(
     if (!chunk.outputBuffer || chunk.outputLength === 0) return null;
 
     const numChannels = chunk.outputBuffer.length;
-    const audioBuf = ctx.createBuffer(
-      numChannels,
-      chunk.outputLength,
-      sampleRate,
-    );
+    const audioBuf = ctx.createBuffer(numChannels, chunk.outputLength, sampleRate);
 
     for (let ch = 0; ch < numChannels; ch++) {
       const channelData = chunk.outputBuffer[ch]!;
@@ -299,14 +295,14 @@ export function createStretcherEngine(
     return audioBuf;
   }
 
-  function playCurrentChunk(offsetInBuffer: number = 0): void {
+  function playCurrentChunk(offsetInBuffer = 0, skipFadeIn = false): void {
     const chunk = chunks[currentChunkIndex];
     if (!chunk || chunk.state !== "ready" || !chunk.outputBuffer) return;
 
     const audioBuf = createAudioBufferFromChunk(chunk);
     if (!audioBuf) return;
 
-    chunkPlayer.playChunk(audioBuf, ctx.currentTime, offsetInBuffer);
+    chunkPlayer.playChunk(audioBuf, ctx.currentTime, offsetInBuffer, skipFadeIn);
   }
 
   function advanceToNextChunk(): void {
@@ -338,6 +334,7 @@ export function createStretcherEngine(
     }
 
     currentChunkIndex = nextIdx;
+    nextChunkScheduledIndex = null;
     scheduler.updatePriorities(currentChunkIndex);
 
     const chunk = chunks[currentChunkIndex];
@@ -353,14 +350,13 @@ export function createStretcherEngine(
     evictDistantChunks();
   }
 
-  function enterBuffering(
-    reason: "initial" | "seek" | "tempo-change" | "underrun",
-  ): void {
+  function enterBuffering(reason: "initial" | "seek" | "tempo-change" | "underrun"): void {
     if (phase === "ended") return;
     // Allow re-entering buffering for tempo-change and seek even if already buffering
     if (phase === "buffering" && reason !== "tempo-change" && reason !== "seek") return;
     phase = "buffering";
     bufferingStartTime = performance.now();
+    nextChunkScheduledIndex = null;
     chunkPlayer.pause();
     emitter.emit("buffering", { reason });
   }
@@ -436,38 +432,25 @@ export function createStretcherEngine(
   }
 
   function getPositionInOriginalBuffer(): number {
-    if (phase === "ended") return totalDuration;
-    if (phase === "waiting") return offset;
-    if (phase === "buffering" && bufferingResumePosition !== null) {
-      return bufferingResumePosition;
-    }
-
-    const chunk = chunks[currentChunkIndex];
-    if (!chunk) return 0;
-
-    // Nominal start time of this chunk in the original buffer
-    const nominalStartSample = chunk.inputStartSample + chunk.overlapBefore;
-    const nominalStartSec = nominalStartSample / sampleRate;
-
-    // Position within the current chunk (in output time)
-    const posInChunk = chunkPlayer.getCurrentPosition();
-
-    // Subtract the crossfade overlap kept at the start of non-first chunks
-    const crossfadeOffset = chunk.overlapBefore > 0 ? CROSSFADE_SEC : 0;
-    const adjustedPosInChunk = Math.max(0, posInChunk - crossfadeOffset);
-
-    // Convert output position back to original buffer time
-    // output duration = input duration / tempo
-    const posInOriginal = adjustedPosInChunk * currentTempo;
-
-    return Math.min(nominalStartSec + posInOriginal, totalDuration);
+    const chunk = chunks[currentChunkIndex] ?? null;
+    return calcPositionInOriginalBuffer({
+      phase,
+      totalDuration,
+      offset,
+      bufferingResumePosition,
+      currentTempo,
+      sampleRate,
+      crossfadeSec: CROSSFADE_SEC,
+      chunk: chunk
+        ? { inputStartSample: chunk.inputStartSample, overlapBefore: chunk.overlapBefore }
+        : null,
+      posInChunk: chunkPlayer.getCurrentPosition(),
+    });
   }
 
   function getStatus(): StretcherStatus {
     const readyCount = chunks.filter((c) => c.state === "ready").length;
-    const convertingCount = chunks.filter(
-      (c) => c.state === "converting",
-    ).length;
+    const convertingCount = chunks.filter((c) => c.state === "converting").length;
     const total = chunks.length;
 
     return {
@@ -493,9 +476,7 @@ export function createStretcherEngine(
   function getSnapshot(): StretcherSnapshotExtension {
     const readyCount = chunks.filter((c) => c.state === "ready").length;
     const total = chunks.length;
-    const convertingCount = chunks.filter(
-      (c) => c.state === "converting",
-    ).length;
+    const convertingCount = chunks.filter((c) => c.state === "converting").length;
 
     const windowStart = Math.max(0, currentChunkIndex - keepBehind);
     const windowEnd = Math.min(total - 1, currentChunkIndex + keepAhead);
@@ -542,12 +523,39 @@ export function createStretcherEngine(
   function resume(): void {
     if (disposed || phase !== "paused") return;
 
+    if (pendingTempoChange) {
+      pendingTempoChange = false;
+      currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition!, sampleRate);
+      enterBuffering("tempo-change");
+      scheduler.updatePriorities(currentChunkIndex);
+      scheduler.handleTempoChange(currentTempo);
+      return;
+    }
+
+    if (bufferingResumePosition !== null) {
+      const resumePos = bufferingResumePosition;
+      bufferingResumePosition = null;
+      const chunk = chunks[currentChunkIndex];
+      if (chunk && chunk.state === "ready" && chunk.outputBuffer) {
+        const nominalStartSample = chunk.inputStartSample + chunk.overlapBefore;
+        const nominalStartSec = nominalStartSample / sampleRate;
+        const offsetInOriginal = resumePos - nominalStartSec;
+        const offsetInOutput = Math.max(0, offsetInOriginal / currentTempo);
+        phase = "playing";
+        playCurrentChunk(getCrossfadeStart(chunk) + offsetInOutput, true);
+      } else {
+        bufferingResumePosition = resumePos;
+        enterBuffering("seek");
+      }
+      return;
+    }
+
     const chunk = chunks[currentChunkIndex];
     if (chunk && chunk.state === "ready") {
       const resumePosition = chunkPlayer.getCurrentPosition();
       phase = "playing";
       chunkPlayer.resume();
-      playCurrentChunk(resumePosition);
+      playCurrentChunk(resumePosition, true);
     } else {
       enterBuffering("underrun");
     }
@@ -559,14 +567,14 @@ export function createStretcherEngine(
     const clamped = Math.max(0, Math.min(position, totalDuration));
     const newChunkIdx = getChunkIndexForTime(chunks, clamped, sampleRate);
     currentChunkIndex = newChunkIdx;
+    nextChunkScheduledIndex = null;
 
     scheduler.handleSeek(newChunkIdx);
 
     const chunk = chunks[newChunkIdx];
     if (chunk && chunk.state === "ready") {
       // Calculate offset within the chunk
-      const nominalStartSample =
-        chunk.inputStartSample + chunk.overlapBefore;
+      const nominalStartSample = chunk.inputStartSample + chunk.overlapBefore;
       const nominalStartSec = nominalStartSample / sampleRate;
       const offsetInOriginal = clamped - nominalStartSec;
       const offsetInOutput = offsetInOriginal / currentTempo;
@@ -580,10 +588,16 @@ export function createStretcherEngine(
           const clampedOffset = Math.min(Math.max(0, bufferOffset), audioBuf.duration - 0.001);
           chunkPlayer.handleSeek(audioBuf, clampedOffset);
         }
+      } else if (phase === "paused") {
+        bufferingResumePosition = clamped;
       }
     } else {
-      bufferingResumePosition = clamped;
-      enterBuffering("seek");
+      if (phase === "paused") {
+        bufferingResumePosition = clamped;
+      } else {
+        bufferingResumePosition = clamped;
+        enterBuffering("seek");
+      }
     }
   }
 
@@ -597,19 +611,46 @@ export function createStretcherEngine(
     isLooping = value;
   }
 
+  let tempoDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
   function setTempo(newTempo: number): void {
     if (disposed || phase === "ended" || newTempo === currentTempo) return;
-    bufferingResumePosition = getPositionInOriginalBuffer();
-    currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition, sampleRate);
+
+    if (phase === "paused") {
+      if (!pendingTempoChange) {
+        bufferingResumePosition = getPositionInOriginalBuffer();
+      }
+      currentTempo = newTempo;
+      pendingTempoChange = true;
+      return;
+    }
+
+    const isFirstInBurst = tempoDebounceTimer === null;
+
+    if (isFirstInBurst) {
+      bufferingResumePosition = getPositionInOriginalBuffer();
+      currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition, sampleRate);
+      enterBuffering("tempo-change");
+    }
+
     currentTempo = newTempo;
-    enterBuffering("tempo-change");
-    scheduler.updatePriorities(currentChunkIndex);
-    scheduler.handleTempoChange(newTempo);
+
+    if (tempoDebounceTimer !== null) clearTimeout(tempoDebounceTimer);
+    tempoDebounceTimer = setTimeout(() => {
+      tempoDebounceTimer = null;
+      if (disposed || phase === "ended") return;
+      scheduler.updatePriorities(currentChunkIndex);
+      scheduler.handleTempoChange(currentTempo);
+    }, 50);
   }
 
   function dispose(): void {
     if (disposed) return;
     disposed = true;
+    if (tempoDebounceTimer !== null) {
+      clearTimeout(tempoDebounceTimer);
+      tempoDebounceTimer = null;
+    }
     chunkPlayer.dispose();
     scheduler.dispose();
     workerManager.terminate();

@@ -9,9 +9,7 @@ import type { PriorityQueue } from "./types.js";
  *
  * @param compareFn - Returns negative if a has higher priority (lower value) than b
  */
-export function createPriorityQueue<T>(
-  compareFn: (a: T, b: T) => number,
-): PriorityQueue<T> {
+export function createPriorityQueue<T>(compareFn: (a: T, b: T) => number): PriorityQueue<T> {
   const heap: T[] = [];
 
   function parent(i: number): number {

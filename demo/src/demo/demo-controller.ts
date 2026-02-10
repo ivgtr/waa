@@ -151,6 +151,7 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
 
   function resetCursor() {
     if (waveformCursor) waveformCursor.style.left = '0%';
+    if (waveformCanvas && peaks.length > 0) drawWaveform(waveformCanvas, peaks, 0);
     if (waveformShowTime && timeCurrent) timeCurrent.textContent = formatTime(0);
     prevProgress = -1;
     prevTimeText = '';
@@ -200,7 +201,10 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
 
   if (waveformEnabled && waveformCanvas) {
     on(window, 'resize', () => {
-      if (peaks.length > 0) drawWaveform(waveformCanvas, peaks);
+      if (peaks.length > 0) {
+        const p = prevProgress < 0 ? 0 : prevProgress / 100;
+        drawWaveform(waveformCanvas, peaks, p);
+      }
     });
 
     if (waveformSeekable) {
@@ -215,9 +219,11 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
 
           if (currentPlayback && (currentPlayback.getState() === 'playing' || currentPlayback.getState() === 'paused')) {
             currentPlayback.seek(position);
+            drawWaveform(waveformCanvas, peaks, ratio);
           } else {
             pendingSeekPosition = position;
             if (waveformCursor) waveformCursor.style.left = `${ratio * 100}%`;
+            drawWaveform(waveformCanvas, peaks, ratio);
             if (waveformShowTime && timeCurrent) timeCurrent.textContent = formatTime(position);
           }
         });
@@ -258,10 +264,11 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
 
       // Frame loop
       stopFrameLoop = player.onFrame(currentPlayback, (snapshot) => {
-        // Diff-based cursor update
+        // Diff-based cursor + waveform update
         const progressPct = snapshot.progress * 100;
-        if (waveformCursor && Math.abs(progressPct - prevProgress) > 0.05) {
-          waveformCursor.style.left = `${progressPct}%`;
+        if (Math.abs(progressPct - prevProgress) > 0.05) {
+          if (waveformCursor) waveformCursor.style.left = `${progressPct}%`;
+          if (waveformCanvas && peaks.length > 0) drawWaveform(waveformCanvas, peaks, snapshot.progress);
           prevProgress = progressPct;
         }
         // Diff-based time update
@@ -320,7 +327,8 @@ export function createDemoController(options: DemoControllerOptions): DemoContro
     updateWaveform(resolution: number) {
       if (!currentBuffer || !waveformCanvas) return;
       peaks = player.extractPeakPairs(currentBuffer, { resolution });
-      drawWaveform(waveformCanvas, peaks);
+      const p = prevProgress < 0 ? 0 : prevProgress / 100;
+      drawWaveform(waveformCanvas, peaks, p);
     },
   };
 

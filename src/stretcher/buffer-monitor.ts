@@ -3,9 +3,9 @@
 // ---------------------------------------------------------------------------
 
 import {
+  BUFFER_CRITICAL_SEC,
   BUFFER_HEALTHY_SEC,
   BUFFER_LOW_SEC,
-  BUFFER_CRITICAL_SEC,
   BUFFER_RESUME_SEC,
   CHUNK_DURATION_SEC,
 } from "./constants.js";
@@ -14,19 +14,14 @@ import type { BufferHealth, BufferMonitor, BufferMonitorOptions, ChunkInfo } fro
 /**
  * Create a buffer health monitor with hysteresis.
  */
-export function createBufferMonitor(
-  options?: Partial<BufferMonitorOptions>,
-): BufferMonitor {
+export function createBufferMonitor(options?: Partial<BufferMonitorOptions>): BufferMonitor {
   const healthySec = options?.healthySec ?? BUFFER_HEALTHY_SEC;
   const lowSec = options?.lowSec ?? BUFFER_LOW_SEC;
   const criticalSec = options?.criticalSec ?? BUFFER_CRITICAL_SEC;
   const resumeSec = options?.resumeSec ?? BUFFER_RESUME_SEC;
   const chunkDurSec = options?.chunkDurationSec ?? CHUNK_DURATION_SEC;
 
-  function getAheadSeconds(
-    currentChunkIndex: number,
-    chunks: ChunkInfo[],
-  ): number {
+  function getAheadSeconds(currentChunkIndex: number, chunks: ChunkInfo[]): number {
     let aheadSec = 0;
     for (let i = currentChunkIndex; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -36,10 +31,7 @@ export function createBufferMonitor(
     return aheadSec;
   }
 
-  function getHealth(
-    currentChunkIndex: number,
-    chunks: ChunkInfo[],
-  ): BufferHealth {
+  function getHealth(currentChunkIndex: number, chunks: ChunkInfo[]): BufferHealth {
     const ahead = getAheadSeconds(currentChunkIndex, chunks);
 
     if (ahead >= healthySec) return "healthy";
@@ -48,10 +40,7 @@ export function createBufferMonitor(
     return "empty";
   }
 
-  function shouldEnterBuffering(
-    currentChunkIndex: number,
-    chunks: ChunkInfo[],
-  ): boolean {
+  function shouldEnterBuffering(currentChunkIndex: number, chunks: ChunkInfo[]): boolean {
     const ahead = getAheadSeconds(currentChunkIndex, chunks);
     if (ahead >= criticalSec) return false;
 
@@ -66,10 +55,7 @@ export function createBufferMonitor(
     return ahead < criticalSec;
   }
 
-  function shouldExitBuffering(
-    currentChunkIndex: number,
-    chunks: ChunkInfo[],
-  ): boolean {
+  function shouldExitBuffering(currentChunkIndex: number, chunks: ChunkInfo[]): boolean {
     // カレントチャンクが ready でなければ buffering を抜けない
     const currentChunk = chunks[currentChunkIndex];
     if (!currentChunk || currentChunk.state !== "ready") return false;
@@ -82,9 +68,7 @@ export function createBufferMonitor(
     if (nextChunk && nextChunk.state === "ready") return true;
 
     // If all chunks are done
-    const allReady = chunks.every(
-      (c) => c.state === "ready" || c.state === "skipped",
-    );
+    const allReady = chunks.every((c) => c.state === "ready" || c.state === "skipped");
     if (allReady) return true;
 
     return false;

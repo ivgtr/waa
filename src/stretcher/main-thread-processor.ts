@@ -3,8 +3,8 @@
 // Worker support, e.g. iOS Safari 14-, strict CSP)
 // ---------------------------------------------------------------------------
 
-import { wsolaTimeStretch } from "./wsola.js";
 import type { WorkerManager, WorkerResponse } from "./types.js";
+import { wsolaTimeStretch } from "./wsola.js";
 
 /**
  * Create a WorkerManager-compatible processor that runs WSOLA on the main
@@ -19,7 +19,7 @@ export function createMainThreadProcessor(
 
   // Track the current conversion so it can be cancelled
   let currentChunkIndex: number | null = null;
-  let cancelledChunks = new Set<number>();
+  const cancelledChunks = new Set<number>();
   let busy = false;
 
   return {
