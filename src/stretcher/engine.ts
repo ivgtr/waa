@@ -3,14 +3,23 @@
 // ---------------------------------------------------------------------------
 
 import { createEmitter } from "../emitter.js";
-import { CHUNK_DURATION_SEC, OVERLAP_SEC, CROSSFADE_SEC, KEEP_AHEAD_CHUNKS, KEEP_AHEAD_SECONDS, KEEP_BEHIND_CHUNKS, KEEP_BEHIND_SECONDS, WORKER_POOL_SIZE, LOOKAHEAD_THRESHOLD_SEC } from "./constants.js";
-import { splitIntoChunks, extractChunkData, getChunkIndexForTime } from "./chunk-splitter.js";
-import { createWorkerManager } from "./worker-manager.js";
-import { createMainThreadProcessor } from "./main-thread-processor.js";
-import { createConversionScheduler } from "./conversion-scheduler.js";
-import { createChunkPlayer } from "./chunk-player.js";
 import { createBufferMonitor } from "./buffer-monitor.js";
+import { createChunkPlayer } from "./chunk-player.js";
+import { extractChunkData, getChunkIndexForTime, splitIntoChunks } from "./chunk-splitter.js";
+import {
+  CHUNK_DURATION_SEC,
+  CROSSFADE_SEC,
+  KEEP_AHEAD_CHUNKS,
+  KEEP_AHEAD_SECONDS,
+  KEEP_BEHIND_CHUNKS,
+  KEEP_BEHIND_SECONDS,
+  LOOKAHEAD_THRESHOLD_SEC,
+  OVERLAP_SEC,
+  WORKER_POOL_SIZE,
+} from "./constants.js";
 import { createConversionEstimator } from "./conversion-estimator.js";
+import { createConversionScheduler } from "./conversion-scheduler.js";
+import { createMainThreadProcessor } from "./main-thread-processor.js";
 import { calcPositionInOriginalBuffer } from "./position-calc.js";
 import type {
   ChunkInfo,
@@ -23,6 +32,7 @@ import type {
   WorkerManager,
   WorkerResponse,
 } from "./types.js";
+import { createWorkerManager } from "./worker-manager.js";
 
 /**
  * Trim overlap regions from WSOLA output so adjacent chunks don't double-play.
@@ -52,7 +62,7 @@ export function trimOverlap(
   }
 
   return {
-    data: outputData.map(ch => ch.slice(trimStart, trimStart + newLength)),
+    data: outputData.map((ch) => ch.slice(trimStart, trimStart + newLength)),
     length: newLength,
   };
 }
@@ -92,15 +102,13 @@ export function createStretcherEngine(
 
   // Memory management window
   const keepAhead = Math.max(KEEP_AHEAD_CHUNKS, Math.ceil(KEEP_AHEAD_SECONDS / CHUNK_DURATION_SEC));
-  const keepBehind = Math.max(KEEP_BEHIND_CHUNKS, Math.ceil(KEEP_BEHIND_SECONDS / CHUNK_DURATION_SEC));
+  const keepBehind = Math.max(
+    KEEP_BEHIND_CHUNKS,
+    Math.ceil(KEEP_BEHIND_SECONDS / CHUNK_DURATION_SEC),
+  );
 
   // Split buffer into chunks
-  const chunks = splitIntoChunks(
-    buffer.length,
-    sampleRate,
-    CHUNK_DURATION_SEC,
-    OVERLAP_SEC,
-  );
+  const chunks = splitIntoChunks(buffer.length, sampleRate, CHUNK_DURATION_SEC, OVERLAP_SEC);
 
   // Estimator
   const estimator = createConversionEstimator();
@@ -125,11 +133,7 @@ export function createStretcherEngine(
           chunk,
           sampleRate,
         );
-        schedulerInternal._handleResult(
-          response.chunkIndex,
-          trimmed.data,
-          trimmed.length,
-        );
+        schedulerInternal._handleResult(response.chunkIndex, trimmed.data, trimmed.length);
       }
     } else if (response.type === "cancelled") {
       const chunk = chunks[response.chunkIndex];
@@ -143,10 +147,7 @@ export function createStretcherEngine(
   function handleWorkerError(response: WorkerResponse): void {
     if (disposed) return;
     if (response.type === "error") {
-      schedulerInternal._handleError(
-        response.chunkIndex,
-        response.error ?? "Unknown error",
-      );
+      schedulerInternal._handleError(response.chunkIndex, response.error ?? "Unknown error");
     }
   }
 
@@ -200,9 +201,7 @@ export function createStretcherEngine(
         const audioBuffer = createAudioBufferFromChunk(nextChunk);
         if (audioBuffer) {
           const curChunk = chunks[currentChunkIndex];
-          const curOutputDuration = curChunk
-            ? curChunk.outputLength / sampleRate
-            : 0;
+          const curOutputDuration = curChunk ? curChunk.outputLength / sampleRate : 0;
           const elapsed = chunkPlayer.getCurrentPosition();
           const remaining = curOutputDuration - elapsed;
           const startTime = ctx.currentTime + Math.max(0, remaining);
@@ -243,15 +242,13 @@ export function createStretcherEngine(
     if (phase === "playing" && chunkIndex === currentChunkIndex + 1) {
       if (!chunkPlayer.hasNextScheduled()) {
         const curChunk = chunks[currentChunkIndex];
-        const curOutputDuration = curChunk
-          ? curChunk.outputLength / sampleRate
-          : 0;
+        const curOutputDuration = curChunk ? curChunk.outputLength / sampleRate : 0;
         const elapsed = chunkPlayer.getCurrentPosition();
         const remaining = curOutputDuration - elapsed;
 
         if (remaining <= LOOKAHEAD_THRESHOLD_SEC) {
           const nextChunk = chunks[chunkIndex];
-          if (nextChunk && nextChunk.outputBuffer) {
+          if (nextChunk?.outputBuffer) {
             const audioBuffer = createAudioBufferFromChunk(nextChunk);
             if (audioBuffer) {
               const startTime = ctx.currentTime + Math.max(0, remaining);
@@ -286,11 +283,7 @@ export function createStretcherEngine(
     if (!chunk.outputBuffer || chunk.outputLength === 0) return null;
 
     const numChannels = chunk.outputBuffer.length;
-    const audioBuf = ctx.createBuffer(
-      numChannels,
-      chunk.outputLength,
-      sampleRate,
-    );
+    const audioBuf = ctx.createBuffer(numChannels, chunk.outputLength, sampleRate);
 
     for (let ch = 0; ch < numChannels; ch++) {
       const channelData = chunk.outputBuffer[ch]!;
@@ -354,9 +347,7 @@ export function createStretcherEngine(
     evictDistantChunks();
   }
 
-  function enterBuffering(
-    reason: "initial" | "seek" | "tempo-change" | "underrun",
-  ): void {
+  function enterBuffering(reason: "initial" | "seek" | "tempo-change" | "underrun"): void {
     if (phase === "ended") return;
     // Allow re-entering buffering for tempo-change and seek even if already buffering
     if (phase === "buffering" && reason !== "tempo-change" && reason !== "seek") return;
@@ -455,9 +446,7 @@ export function createStretcherEngine(
 
   function getStatus(): StretcherStatus {
     const readyCount = chunks.filter((c) => c.state === "ready").length;
-    const convertingCount = chunks.filter(
-      (c) => c.state === "converting",
-    ).length;
+    const convertingCount = chunks.filter((c) => c.state === "converting").length;
     const total = chunks.length;
 
     return {
@@ -483,9 +472,7 @@ export function createStretcherEngine(
   function getSnapshot(): StretcherSnapshotExtension {
     const readyCount = chunks.filter((c) => c.state === "ready").length;
     const total = chunks.length;
-    const convertingCount = chunks.filter(
-      (c) => c.state === "converting",
-    ).length;
+    const convertingCount = chunks.filter((c) => c.state === "converting").length;
 
     const windowStart = Math.max(0, currentChunkIndex - keepBehind);
     const windowEnd = Math.min(total - 1, currentChunkIndex + keepAhead);
@@ -555,8 +542,7 @@ export function createStretcherEngine(
     const chunk = chunks[newChunkIdx];
     if (chunk && chunk.state === "ready") {
       // Calculate offset within the chunk
-      const nominalStartSample =
-        chunk.inputStartSample + chunk.overlapBefore;
+      const nominalStartSample = chunk.inputStartSample + chunk.overlapBefore;
       const nominalStartSec = nominalStartSample / sampleRate;
       const offsetInOriginal = clamped - nominalStartSec;
       const offsetInOutput = offsetInOriginal / currentTempo;

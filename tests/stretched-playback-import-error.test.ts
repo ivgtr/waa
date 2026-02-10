@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the stretcher engine module to simulate import failures
 vi.mock("../src/stretcher/engine.js", () => ({

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createScheduler, createClock } from "../src/scheduler.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createClock, createScheduler } from "../src/scheduler.js";
 import { createMockAudioContext } from "./helpers/audio-mocks.js";
 
 describe("scheduler", () => {

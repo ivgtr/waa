@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  stubWorkerGlobals,
-  createMockAudioContext,
   createMockAudioBuffer,
+  createMockAudioContext,
   findActiveSource,
   type MockAudioContext,
+  stubWorkerGlobals,
 } from "../helpers/audio-mocks";
 
 // ---------------------------------------------------------------------------
@@ -22,7 +22,11 @@ const CHUNK0_RAW = 361620;
 const CHUNK1_RAW = 370440;
 const CHUNK2_RAW = 361620;
 
-function createEngine(ctx: MockAudioContext, buffer: AudioBuffer, opts?: Partial<{ tempo: number; loop: boolean; offset: number }>) {
+function createEngine(
+  ctx: MockAudioContext,
+  buffer: AudioBuffer,
+  opts?: Partial<{ tempo: number; loop: boolean; offset: number }>,
+) {
   return createStretcherEngine(ctx, buffer, {
     tempo: opts?.tempo ?? 1.0,
     loop: opts?.loop ?? false,
@@ -34,7 +38,7 @@ function createEngine(ctx: MockAudioContext, buffer: AudioBuffer, opts?: Partial
 // Tests
 // ---------------------------------------------------------------------------
 
-let createStretcherEngine: (typeof import("../../src/stretcher/engine"))["createStretcherEngine"];
+let createStretcherEngine: typeof import("../../src/stretcher/engine")["createStretcherEngine"];
 
 describe("engine – advanced paths", () => {
   let ctx: MockAudioContext;
@@ -509,9 +513,7 @@ describe("engine – advanced paths", () => {
       workerStubs.simulateWorkerError(0, 0, "fail2");
       workerStubs.simulateWorkerError(0, 0, "fail3");
 
-      const fatalCall = errorHandler.mock.calls.find(
-        (call: any) => call[0].fatal === true,
-      );
+      const fatalCall = errorHandler.mock.calls.find((call: any) => call[0].fatal === true);
       expect(fatalCall).toBeDefined();
 
       engine.dispose();

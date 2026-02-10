@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { trimOverlap } from "../../src/stretcher/engine";
 import type { ChunkInfo } from "../../src/stretcher/types";
 

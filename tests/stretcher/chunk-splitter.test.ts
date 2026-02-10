@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  splitIntoChunks,
   getChunkIndexForSample,
   getChunkIndexForTime,
+  splitIntoChunks,
 } from "../../src/stretcher/chunk-splitter";
 
 describe("splitIntoChunks", () => {
@@ -68,10 +68,8 @@ describe("splitIntoChunks", () => {
     for (let i = 0; i < chunks.length - 1; i++) {
       const current = chunks[i]!;
       const next = chunks[i + 1]!;
-      const currentNominalEnd =
-        current.inputEndSample - current.overlapAfter;
-      const nextNominalStart =
-        next.inputStartSample + next.overlapBefore;
+      const currentNominalEnd = current.inputEndSample - current.overlapAfter;
+      const nextNominalStart = next.inputStartSample + next.overlapBefore;
       expect(currentNominalEnd).toBe(nextNominalStart);
     }
 
@@ -105,9 +103,7 @@ describe("getChunkIndexForSample", () => {
   it("returns last chunk for a sample past the end", () => {
     const totalSamples = sampleRate * 90;
     const chunks = splitIntoChunks(totalSamples, sampleRate, 30, 0.2);
-    expect(getChunkIndexForSample(chunks, totalSamples + 1000)).toBe(
-      chunks.length - 1,
-    );
+    expect(getChunkIndexForSample(chunks, totalSamples + 1000)).toBe(chunks.length - 1);
   });
 
   it("returns correct chunk for a sample in the middle", () => {

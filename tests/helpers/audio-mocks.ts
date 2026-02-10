@@ -145,7 +145,11 @@ export function createMockAudioContext(
           setValueCurveAtTime: vi.fn(),
           cancelScheduledValues: vi.fn(),
         },
-        context: { get currentTime() { return _currentTime; } },
+        context: {
+          get currentTime() {
+            return _currentTime;
+          },
+        },
         connect: vi.fn(),
         disconnect: vi.fn(),
       };
@@ -209,21 +213,19 @@ export function createMockAudioContext(
       return createMockAudioBuffer(length / _sampleRate, _sampleRate);
     }),
 
-    createBuffer: vi.fn(
-      (channels: number, length: number, sampleRate: number) => {
-        const channelData: Float32Array[] = [];
-        for (let i = 0; i < channels; i++) {
-          channelData.push(new Float32Array(length));
-        }
-        return {
-          numberOfChannels: channels,
-          length,
-          sampleRate,
-          duration: length / sampleRate,
-          getChannelData: (ch: number) => channelData[ch]!,
-        };
-      },
-    ),
+    createBuffer: vi.fn((channels: number, length: number, sampleRate: number) => {
+      const channelData: Float32Array[] = [];
+      for (let i = 0; i < channels; i++) {
+        channelData.push(new Float32Array(length));
+      }
+      return {
+        numberOfChannels: channels,
+        length,
+        sampleRate,
+        duration: length / sampleRate,
+        getChannelData: (ch: number) => channelData[ch]!,
+      };
+    }),
 
     _sources: sources,
     _gains: gains,
@@ -280,17 +282,9 @@ export interface MockWorker {
 
 export function stubWorkerGlobals(): {
   workers: MockWorker[];
-  simulateWorkerResult: (
-    workerIndex: number,
-    chunkIndex: number,
-    outputLength: number,
-  ) => void;
+  simulateWorkerResult: (workerIndex: number, chunkIndex: number, outputLength: number) => void;
   simulateWorkerCancel: (workerIndex: number, chunkIndex: number) => void;
-  simulateWorkerError: (
-    workerIndex: number,
-    chunkIndex: number,
-    error: string,
-  ) => void;
+  simulateWorkerError: (workerIndex: number, chunkIndex: number, error: string) => void;
   simulateWorkerCrash: (workerIndex: number, message?: string) => void;
 } {
   const workers: MockWorker[] = [];
@@ -324,11 +318,7 @@ export function stubWorkerGlobals(): {
 
   vi.stubGlobal("Blob", vi.fn());
 
-  function simulateWorkerResult(
-    workerIndex: number,
-    chunkIndex: number,
-    outputLength: number,
-  ) {
+  function simulateWorkerResult(workerIndex: number, chunkIndex: number, outputLength: number) {
     const worker = workers[workerIndex];
     if (!worker?.onmessage) {
       throw new Error(`Worker ${workerIndex} has no onmessage handler`);
@@ -353,11 +343,7 @@ export function stubWorkerGlobals(): {
     } as MessageEvent);
   }
 
-  function simulateWorkerError(
-    workerIndex: number,
-    chunkIndex: number,
-    error: string,
-  ) {
+  function simulateWorkerError(workerIndex: number, chunkIndex: number, error: string) {
     const worker = workers[workerIndex];
     if (!worker?.onmessage) {
       throw new Error(`Worker ${workerIndex} has no onmessage handler`);

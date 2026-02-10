@@ -13,12 +13,7 @@ export type ChunkState =
   | "evicted";
 
 /** Playback state of the stretcher engine. */
-export type StretcherPlaybackState =
-  | "waiting"
-  | "playing"
-  | "buffering"
-  | "paused"
-  | "ended";
+export type StretcherPlaybackState = "waiting" | "playing" | "buffering" | "paused" | "ended";
 
 /** Buffer health classification. */
 export type BufferHealth = "healthy" | "low" | "critical" | "empty";
@@ -78,10 +73,7 @@ export interface WorkerErrorResponse {
   error: string;
 }
 
-export type WorkerResponse =
-  | WorkerResultResponse
-  | WorkerCancelledResponse
-  | WorkerErrorResponse;
+export type WorkerResponse = WorkerResultResponse | WorkerCancelledResponse | WorkerErrorResponse;
 
 // ---------------------------------------------------------------------------
 // Conversion Scheduler
@@ -175,9 +167,9 @@ export interface StretcherEvents {
   buffering: { reason: "initial" | "seek" | "tempo-change" | "underrun" };
   buffered: { stallDuration: number };
   chunkready: { index: number };
-  complete: void;
-  ended: void;
-  loop: void;
+  complete: undefined;
+  ended: undefined;
+  loop: undefined;
   error: { message: string; chunkIndex?: number; fatal: boolean };
 }
 
@@ -197,10 +189,7 @@ export interface StretcherEngine {
     event: K,
     handler: (data: StretcherEvents[K]) => void,
   ): () => void;
-  off<K extends keyof StretcherEvents>(
-    event: K,
-    handler: (data: StretcherEvents[K]) => void,
-  ): void;
+  off<K extends keyof StretcherEvents>(event: K, handler: (data: StretcherEvents[K]) => void): void;
   dispose(): void;
 }
 
@@ -253,11 +242,7 @@ export interface ConversionScheduler {
   dispatchNext(): void;
   getChunks(): ChunkInfo[];
   dispose(): void;
-  _handleResult(
-    chunkIndex: number,
-    outputData: Float32Array[],
-    outputLength: number,
-  ): void;
+  _handleResult(chunkIndex: number, outputData: Float32Array[], outputLength: number): void;
   _handleError(chunkIndex: number, error: string): void;
 }
 
@@ -266,11 +251,7 @@ export interface ConversionScheduler {
 // ---------------------------------------------------------------------------
 
 export interface ChunkPlayer {
-  playChunk(
-    buffer: AudioBuffer,
-    startTime: number,
-    offsetInChunk?: number,
-  ): void;
+  playChunk(buffer: AudioBuffer, startTime: number, offsetInChunk?: number): void;
   scheduleNext(buffer: AudioBuffer, startTime: number): void;
   hasNextScheduled(): boolean;
   handleSeek(buffer: AudioBuffer, offsetInChunk: number): void;
@@ -291,14 +272,8 @@ export interface ChunkPlayer {
 export interface BufferMonitor {
   getHealth(currentChunkIndex: number, chunks: ChunkInfo[]): BufferHealth;
   getAheadSeconds(currentChunkIndex: number, chunks: ChunkInfo[]): number;
-  shouldEnterBuffering(
-    currentChunkIndex: number,
-    chunks: ChunkInfo[],
-  ): boolean;
-  shouldExitBuffering(
-    currentChunkIndex: number,
-    chunks: ChunkInfo[],
-  ): boolean;
+  shouldEnterBuffering(currentChunkIndex: number, chunks: ChunkInfo[]): boolean;
+  shouldExitBuffering(currentChunkIndex: number, chunks: ChunkInfo[]): boolean;
 }
 
 // ---------------------------------------------------------------------------

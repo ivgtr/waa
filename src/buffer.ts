@@ -54,10 +54,7 @@ export async function loadBuffer(
 /**
  * Decode an `AudioBuffer` from a `Blob` or `File`.
  */
-export async function loadBufferFromBlob(
-  ctx: AudioContext,
-  blob: Blob,
-): Promise<AudioBuffer> {
+export async function loadBufferFromBlob(ctx: AudioContext, blob: Blob): Promise<AudioBuffer> {
   const arrayBuffer = await blob.arrayBuffer();
   return ctx.decodeAudioData(arrayBuffer);
 }

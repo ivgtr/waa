@@ -12,7 +12,7 @@ function createEqualPowerCurve(fadeIn: boolean): Float32Array {
   const curve = new Float32Array(CURVE_LENGTH);
   for (let i = 0; i < CURVE_LENGTH; i++) {
     const t = i / (CURVE_LENGTH - 1);
-    curve[i] = fadeIn ? Math.sin(t * Math.PI / 2) : Math.cos(t * Math.PI / 2);
+    curve[i] = fadeIn ? Math.sin((t * Math.PI) / 2) : Math.cos((t * Math.PI) / 2);
   }
   return curve;
 }
@@ -23,10 +23,7 @@ const fadeOutCurve = createEqualPowerCurve(false);
 /**
  * Create a chunk player that manages gapless playback of converted chunks.
  */
-export function createChunkPlayer(
-  ctx: AudioContext,
-  options: ChunkPlayerOptions,
-): ChunkPlayer {
+export function createChunkPlayer(ctx: AudioContext, options: ChunkPlayerOptions): ChunkPlayer {
   const destination = options.destination ?? ctx.destination;
   const through = options.through ?? [];
   const crossfadeSec = options.crossfadeSec ?? CROSSFADE_SEC;
@@ -64,10 +61,7 @@ export function createChunkPlayer(
     }
   }
 
-  function createSourceFromBuffer(
-    buffer: AudioBuffer,
-    gain: GainNode,
-  ): AudioBufferSourceNode {
+  function createSourceFromBuffer(buffer: AudioBuffer, gain: GainNode): AudioBufferSourceNode {
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     src.connect(gain);
@@ -173,14 +167,10 @@ export function createChunkPlayer(
   function getElapsedInChunk(): number {
     if (paused) return pausedPosition;
     if (stopped) return 0;
-    return (ctx.currentTime - playStartCtxTime) + playStartOffset;
+    return ctx.currentTime - playStartCtxTime + playStartOffset;
   }
 
-  function playChunk(
-    buffer: AudioBuffer,
-    _startTime: number,
-    offsetInChunk: number = 0,
-  ): void {
+  function playChunk(buffer: AudioBuffer, _startTime: number, offsetInChunk: number = 0): void {
     cancelTransition();
     stopCurrentSource();
     stopNextSource();

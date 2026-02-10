@@ -13,7 +13,7 @@ function computeSnapshot(playback: Playback): PlaybackSnapshot {
   const duration = playback.getDuration();
   const progress = playback.getProgress();
 
-  const getter = (playback as unknown as Record<string, unknown>)["_getStretcherSnapshot"];
+  const getter = (playback as unknown as Record<string, unknown>)._getStretcherSnapshot;
   let stretcher: PlaybackSnapshot["stretcher"];
   if (typeof getter === "function") {
     stretcher = (getter as () => PlaybackSnapshot["stretcher"])();
@@ -66,10 +66,7 @@ export function getSnapshot(playback: Playback): PlaybackSnapshot {
  * const snapshot = useSyncExternalStore(subscribe, snap, snap);
  * ```
  */
-export function subscribeSnapshot(
-  playback: Playback,
-  callback: () => void,
-): () => void {
+export function subscribeSnapshot(playback: Playback, callback: () => void): () => void {
   const count = (subscriberCount.get(playback) ?? 0) + 1;
   subscriberCount.set(playback, count);
 
@@ -148,10 +145,7 @@ export function whenEnded(playback: Playback): Promise<void> {
  * Return a `Promise` that resolves when the playback position reaches or
  * exceeds `position` seconds.
  */
-export function whenPosition(
-  playback: Playback,
-  position: number,
-): Promise<void> {
+export function whenPosition(playback: Playback, position: number): Promise<void> {
   if (playback.getCurrentTime() >= position) {
     return Promise.resolve();
   }

@@ -1,6 +1,6 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { createSineBuffer } from "../../src/synth";
+import { afterEach, describe, expect, it } from "vitest";
 import { play } from "../../src/play";
+import { createSineBuffer } from "../../src/synth";
 
 describe("play() — browser", () => {
   let ctx: AudioContext;

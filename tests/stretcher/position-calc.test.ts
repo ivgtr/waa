@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { calcPositionInOriginalBuffer, type PositionCalcParams } from "../../src/stretcher/position-calc";
+import { describe, expect, it } from "vitest";
+import {
+  calcPositionInOriginalBuffer,
+  type PositionCalcParams,
+} from "../../src/stretcher/position-calc";
 
 function makeParams(overrides: Partial<PositionCalcParams> = {}): PositionCalcParams {
   return {
@@ -57,9 +60,7 @@ describe("calcPositionInOriginalBuffer", () => {
   it("calculates position for first chunk (no crossfade)", () => {
     // inputStartSample=0, overlapBefore=0, nominalStart=0/44100=0
     // crossfadeOffset=0, adjustedPos=2.0, posInOriginal=2.0*1.0=2.0
-    expect(
-      calcPositionInOriginalBuffer(makeParams({ posInChunk: 2.0 })),
-    ).toBe(2.0);
+    expect(calcPositionInOriginalBuffer(makeParams({ posInChunk: 2.0 }))).toBe(2.0);
   });
 
   // --- Middle chunk (overlapBefore > 0) ---
@@ -98,17 +99,17 @@ describe("calcPositionInOriginalBuffer", () => {
   it("calculates correct position at tempo 2.0", () => {
     // nominalStart=0, crossfadeOffset=0, adjustedPos=1.0
     // posInOriginal=1.0*2.0=2.0
-    expect(
-      calcPositionInOriginalBuffer(makeParams({ currentTempo: 2.0, posInChunk: 1.0 })),
-    ).toBe(2.0);
+    expect(calcPositionInOriginalBuffer(makeParams({ currentTempo: 2.0, posInChunk: 1.0 }))).toBe(
+      2.0,
+    );
   });
 
   it("calculates correct position at tempo 0.5", () => {
     // nominalStart=0, crossfadeOffset=0, adjustedPos=1.0
     // posInOriginal=1.0*0.5=0.5
-    expect(
-      calcPositionInOriginalBuffer(makeParams({ currentTempo: 0.5, posInChunk: 1.0 })),
-    ).toBe(0.5);
+    expect(calcPositionInOriginalBuffer(makeParams({ currentTempo: 0.5, posInChunk: 1.0 }))).toBe(
+      0.5,
+    );
   });
 
   it("handles very slow tempo (0.01)", () => {

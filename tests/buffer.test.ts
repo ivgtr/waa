@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { loadBuffer, loadBufferFromBlob, loadBuffers, getBufferInfo } from "../src/buffer.js";
-import { createMockAudioContext, createMockAudioBuffer } from "./helpers/audio-mocks.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getBufferInfo, loadBuffer, loadBufferFromBlob, loadBuffers } from "../src/buffer.js";
+import { createMockAudioBuffer, createMockAudioContext } from "./helpers/audio-mocks.js";
 
 describe("buffer", () => {
   afterEach(() => {
@@ -15,11 +15,14 @@ describe("buffer", () => {
       const mockArrayBuffer = new ArrayBuffer(1024);
       const mockBuffer = createMockAudioBuffer(1);
 
-      vi.stubGlobal("fetch", vi.fn(async () => ({
-        ok: true,
-        headers: new Headers(),
-        arrayBuffer: async () => mockArrayBuffer,
-      })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          headers: new Headers(),
+          arrayBuffer: async () => mockArrayBuffer,
+        })),
+      );
 
       const ctx = createMockAudioContext();
       ctx.decodeAudioData = vi.fn(async () => mockBuffer) as unknown as typeof ctx.decodeAudioData;
@@ -30,15 +33,18 @@ describe("buffer", () => {
     });
 
     it("throws on non-ok response", async () => {
-      vi.stubGlobal("fetch", vi.fn(async () => ({
-        ok: false,
-        status: 404,
-        statusText: "Not Found",
-      })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+        })),
+      );
 
       const ctx = createMockAudioContext();
       await expect(loadBuffer(ctx, "/missing.mp3")).rejects.toThrow(
-        "Failed to fetch audio: 404 Not Found"
+        "Failed to fetch audio: 404 Not Found",
       );
     });
 
@@ -56,11 +62,14 @@ describe("buffer", () => {
         }),
       };
 
-      vi.stubGlobal("fetch", vi.fn(async () => ({
-        ok: true,
-        headers: { get: (name: string) => name === "content-length" ? "8" : null },
-        body: { getReader: () => mockReader },
-      })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          headers: { get: (name: string) => (name === "content-length" ? "8" : null) },
+          body: { getReader: () => mockReader },
+        })),
+      );
 
       const ctx = createMockAudioContext();
       const mockBuffer = createMockAudioBuffer(1);
@@ -80,12 +89,15 @@ describe("buffer", () => {
       const mockArrayBuffer = new ArrayBuffer(1024);
       const mockBuffer = createMockAudioBuffer(1);
 
-      vi.stubGlobal("fetch", vi.fn(async () => ({
-        ok: true,
-        headers: { get: () => null },
-        body: {},
-        arrayBuffer: async () => mockArrayBuffer,
-      })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          headers: { get: () => null },
+          body: {},
+          arrayBuffer: async () => mockArrayBuffer,
+        })),
+      );
 
       const ctx = createMockAudioContext();
       ctx.decodeAudioData = vi.fn(async () => mockBuffer) as unknown as typeof ctx.decodeAudioData;
@@ -129,11 +141,14 @@ describe("buffer", () => {
       const mockBuffer2 = createMockAudioBuffer(2);
       let callCount = 0;
 
-      vi.stubGlobal("fetch", vi.fn(async () => ({
-        ok: true,
-        headers: new Headers(),
-        arrayBuffer: async () => new ArrayBuffer(1024),
-      })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          headers: new Headers(),
+          arrayBuffer: async () => new ArrayBuffer(1024),
+        })),
+      );
 
       const ctx = createMockAudioContext();
       ctx.decodeAudioData = vi.fn(async () => {

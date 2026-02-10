@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { createSineBuffer, createNoiseBuffer, createClickBuffer } from "../src/synth.js";
+import { describe, expect, it } from "vitest";
+import { createClickBuffer, createNoiseBuffer, createSineBuffer } from "../src/synth.js";
 import { createMockAudioContext } from "./helpers/audio-mocks.js";
 
 describe("synth", () => {

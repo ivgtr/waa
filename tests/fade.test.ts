@@ -1,10 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
-import { fadeIn, fadeOut, crossfade, autoFade } from "../src/fade.js";
-import { createMockAudioContext, createMockPlayback } from "./helpers/audio-mocks.js";
+import { describe, expect, it } from "vitest";
+import { autoFade, crossfade, fadeIn, fadeOut } from "../src/fade.js";
 import type { MockGainNode } from "./helpers/audio-mocks.js";
+import { createMockAudioContext, createMockPlayback } from "./helpers/audio-mocks.js";
 
 /** Create a GainNode mock from MockAudioContext for fade tests. */
-function createTestGain(ctx: ReturnType<typeof createMockAudioContext>, initialValue = 1): MockGainNode {
+function createTestGain(
+  ctx: ReturnType<typeof createMockAudioContext>,
+  initialValue = 1,
+): MockGainNode {
   const gain = ctx.createGain();
   gain.gain.value = initialValue;
   return gain;
@@ -83,11 +86,7 @@ describe("fade", () => {
       const gainA = createTestGain(ctx, 0.7);
       const gainB = createTestGain(ctx, 0);
 
-      crossfade(
-        gainA as unknown as GainNode,
-        gainB as unknown as GainNode,
-        { duration: 2 },
-      );
+      crossfade(gainA as unknown as GainNode, gainB as unknown as GainNode, { duration: 2 });
 
       // gainA: from 0.7 to 0
       expect(gainA.gain.setValueAtTime).toHaveBeenCalledWith(0.7, 0);
@@ -102,10 +101,7 @@ describe("fade", () => {
       const gainA = createTestGain(ctx, 0);
       const gainB = createTestGain(ctx, 0);
 
-      crossfade(
-        gainA as unknown as GainNode,
-        gainB as unknown as GainNode,
-      );
+      crossfade(gainA as unknown as GainNode, gainB as unknown as GainNode);
 
       // gainB should ramp to 1 (fallback from || 1)
       expect(gainB.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1, 1);

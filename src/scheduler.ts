@@ -27,10 +27,7 @@ export interface Scheduler {
  * Uses `setInterval` to check upcoming events and fire callbacks
  * slightly before their scheduled time, enabling sample-accurate timing.
  */
-export function createScheduler(
-  ctx: AudioContext,
-  options?: SchedulerOptions,
-): Scheduler {
+export function createScheduler(ctx: AudioContext, options?: SchedulerOptions): Scheduler {
   const { lookahead = 0.1, interval = 25 } = options ?? {};
 
   const events: ScheduledEvent[] = [];
@@ -92,10 +89,7 @@ export interface Clock {
 /**
  * Create a BPM-based clock tied to an `AudioContext`.
  */
-export function createClock(
-  ctx: AudioContext,
-  options?: ClockOptions,
-): Clock {
+export function createClock(ctx: AudioContext, options?: ClockOptions): Clock {
   let bpm = options?.bpm ?? 120;
   const startTime = ctx.currentTime;
 

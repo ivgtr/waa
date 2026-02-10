@@ -27,10 +27,7 @@ function applyRamp(
 
   switch (curve) {
     case "exponential":
-      param.exponentialRampToValueAtTime(
-        Math.max(to, EXP_MIN),
-        now + duration,
-      );
+      param.exponentialRampToValueAtTime(Math.max(to, EXP_MIN), now + duration);
       break;
     case "equal-power": {
       // Approximate equal-power with a setValueCurveAtTime.
@@ -44,7 +41,6 @@ function applyRamp(
       param.setValueCurveAtTime(values, now, duration);
       break;
     }
-    case "linear":
     default:
       param.linearRampToValueAtTime(to, now + duration);
       break;
@@ -54,11 +50,7 @@ function applyRamp(
 /**
  * Fade a `GainNode` in from 0 to `target`.
  */
-export function fadeIn(
-  gain: GainNode,
-  target: number,
-  options?: FadeOptions,
-): void {
+export function fadeIn(gain: GainNode, target: number, options?: FadeOptions): void {
   const { duration = 1, curve = "linear" } = options ?? {};
   applyRamp(gain, 0, target, duration, curve);
 }
@@ -74,11 +66,7 @@ export function fadeOut(gain: GainNode, options?: FadeOptions): void {
 /**
  * Crossfade between two `GainNode`s.
  */
-export function crossfade(
-  gainA: GainNode,
-  gainB: GainNode,
-  options?: CrossfadeOptions,
-): void {
+export function crossfade(gainA: GainNode, gainB: GainNode, options?: CrossfadeOptions): void {
   const { duration = 1, curve = "linear" } = options ?? {};
   applyRamp(gainA, gainA.gain.value, 0, duration, curve);
   applyRamp(gainB, 0, gainA.gain.value || 1, duration, curve);
@@ -108,11 +96,7 @@ export function autoFade(
   }
 
   const unsub = playback.on("timeupdate", ({ position }) => {
-    if (
-      fadeOutDuration > 0 &&
-      !fadeOutScheduled &&
-      position >= duration - fadeOutDuration
-    ) {
+    if (fadeOutDuration > 0 && !fadeOutScheduled && position >= duration - fadeOutDuration) {
       fadeOutScheduled = true;
       applyRamp(gain, gain.gain.value, 0, fadeOutDuration, curve);
     }

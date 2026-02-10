@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { play } from "../../src/play";
 import {
-  createMockAudioContext,
   createMockAudioBuffer,
+  createMockAudioContext,
   type MockAudioContext,
 } from "../helpers/audio-mocks";
 

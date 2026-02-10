@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { calcTransitionDelay, TRANSITION_MARGIN_MS } from "../../src/stretcher/transition-timing";
 
 describe("calcTransitionDelay", () => {

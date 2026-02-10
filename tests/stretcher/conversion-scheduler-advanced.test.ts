@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createConversionScheduler } from "../../src/stretcher/conversion-scheduler";
 import type { ChunkInfo, WorkerManager } from "../../src/stretcher/types";
 
@@ -73,9 +73,7 @@ describe("createConversionScheduler – advanced", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks, wm, extractData, 44100, 1.0,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
 
     scheduler.start(0);
 
@@ -96,9 +94,7 @@ describe("createConversionScheduler – advanced", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks, wm, extractData, 44100, 1.0,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
 
     // Fill capacity
     wm.setCapacity(false);
@@ -116,9 +112,7 @@ describe("createConversionScheduler – advanced", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks, wm, extractData, 44100, 1.0,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
 
     scheduler.start(0);
 
@@ -155,9 +149,7 @@ describe("createConversionScheduler – advanced", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks, wm, extractData, 44100, 1.0,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
 
     scheduler.start(0);
 
@@ -172,9 +164,7 @@ describe("createConversionScheduler – advanced", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks, wm, extractData, 44100, 1.0,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
 
     scheduler.start(0);
     const initialCount = wm.posted.length;
@@ -191,10 +181,10 @@ describe("createConversionScheduler – advanced", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks, wm, extractData, 44100, 1.0,
-      { keepAheadChunks: 3, keepBehindChunks: 2 },
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0, {
+      keepAheadChunks: 3,
+      keepBehindChunks: 2,
+    });
 
     scheduler.start(0);
 
@@ -218,10 +208,9 @@ describe("createConversionScheduler – advanced", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks, wm, extractData, 44100, 1.0,
-      { cancelDistanceThreshold: 3 },
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0, {
+      cancelDistanceThreshold: 3,
+    });
 
     scheduler.start(0);
 
@@ -252,8 +241,14 @@ describe("createConversionScheduler – advanced", () => {
     const onFailed = vi.fn();
 
     const scheduler = createConversionScheduler(
-      chunks, wm, extractData, 44100, 1.0,
-      undefined, undefined, onFailed,
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      undefined,
+      undefined,
+      onFailed,
     );
 
     scheduler.start(0);
@@ -277,9 +272,7 @@ describe("createConversionScheduler – advanced", () => {
     const wm = createMockWorkerManager();
     const extractData = vi.fn(() => [new Float32Array(1024)]);
 
-    const scheduler = createConversionScheduler(
-      chunks, wm, extractData, 44100, 1.0,
-    );
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
 
     scheduler.start(0);
 

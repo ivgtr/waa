@@ -19,7 +19,7 @@ export function calcLoopPosition(
   const loopDur = loopEnd - loopStart;
   if (loopDur <= 0) return null;
   const offset = elapsed - loopStart;
-  return ((offset % loopDur) + loopDur) % loopDur + loopStart;
+  return (((offset % loopDur) + loopDur) % loopDur) + loopStart;
 }
 
 /**
@@ -41,11 +41,7 @@ export function calcPlaybackPosition(
 
   // state === "playing"
   if (isLooping) {
-    const looped = calcLoopPosition(
-      elapsed,
-      loopStart ?? 0,
-      loopEnd ?? duration,
-    );
+    const looped = calcLoopPosition(elapsed, loopStart ?? 0, loopEnd ?? duration);
     // Invalid loop region → fall back to non-loop clamping
     if (looped !== null) return looped;
   }

@@ -3,8 +3,8 @@
 // ---------------------------------------------------------------------------
 
 import { MAX_WORKER_CRASHES, WORKER_POOL_SIZE } from "./constants.js";
-import { createWorkerURL, revokeWorkerURL } from "./worker-inline.js";
 import type { WorkerManager, WorkerResponse } from "./types.js";
+import { createWorkerURL, revokeWorkerURL } from "./worker-inline.js";
 
 interface WorkerSlot {
   worker: Worker | null;
@@ -184,7 +184,7 @@ export function createWorkerManager(
     cancelChunk(chunkIndex: number): void {
       if (terminated) return;
       const slot = findSlotByChunk(chunkIndex);
-      if (slot && slot.worker) {
+      if (slot?.worker) {
         slot.worker.postMessage({ type: "cancel", chunkIndex });
       }
     },

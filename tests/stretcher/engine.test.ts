@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { StretcherEngine, StretcherEvents } from "../../src/stretcher/types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // We test the engine using mocked dependencies since Worker is not available in Node.
 // This focuses on the integration logic.
@@ -14,14 +13,27 @@ const mockWorker = {
   removeEventListener: vi.fn(),
 };
 
-vi.stubGlobal("Worker", vi.fn(function MockWorkerCtor(this: typeof mockWorker) {
-  Object.assign(this, { ...mockWorker });
-}));
+vi.stubGlobal(
+  "Worker",
+  vi.fn(function MockWorkerCtor(this: typeof mockWorker) {
+    Object.assign(this, { ...mockWorker });
+  }),
+);
 const OriginalURL = globalThis.URL;
-vi.stubGlobal("URL", Object.assign(
-  function MockURL(...args: ConstructorParameters<typeof URL>) { return new OriginalURL(...args); } as unknown as typeof URL,
-  { createObjectURL: vi.fn(() => "blob:mock"), revokeObjectURL: vi.fn(), prototype: OriginalURL.prototype, canParse: OriginalURL.canParse },
-));
+vi.stubGlobal(
+  "URL",
+  Object.assign(
+    function MockURL(...args: ConstructorParameters<typeof URL>) {
+      return new OriginalURL(...args);
+    } as unknown as typeof URL,
+    {
+      createObjectURL: vi.fn(() => "blob:mock"),
+      revokeObjectURL: vi.fn(),
+      prototype: OriginalURL.prototype,
+      canParse: OriginalURL.canParse,
+    },
+  ),
+);
 vi.stubGlobal("Blob", vi.fn());
 
 describe("createStretcherEngine", () => {

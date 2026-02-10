@@ -12,10 +12,7 @@ function calcBlockSize(dataLength: number, resolution: number): number {
  * Extract normalised peak amplitude values from an `AudioBuffer`.
  * Returns an array of numbers in the range `[0, 1]`.
  */
-export function extractPeaks(
-  buffer: AudioBuffer,
-  options?: ExtractPeaksOptions,
-): number[] {
+export function extractPeaks(buffer: AudioBuffer, options?: ExtractPeaksOptions): number[] {
   const { resolution = 200, channel = 0 } = options ?? {};
   const data = buffer.getChannelData(channel);
   const blockSize = calcBlockSize(data.length, resolution);
@@ -38,10 +35,7 @@ export function extractPeaks(
 /**
  * Extract min/max peak pairs for detailed waveform rendering.
  */
-export function extractPeakPairs(
-  buffer: AudioBuffer,
-  options?: ExtractPeaksOptions,
-): PeakPair[] {
+export function extractPeakPairs(buffer: AudioBuffer, options?: ExtractPeaksOptions): PeakPair[] {
   const { resolution = 200, channel = 0 } = options ?? {};
   const data = buffer.getChannelData(channel);
   const blockSize = calcBlockSize(data.length, resolution);

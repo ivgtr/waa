@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { calcLoopPosition, calcPlaybackPosition } from "../src/playback-position";
 
 describe("calcLoopPosition", () => {

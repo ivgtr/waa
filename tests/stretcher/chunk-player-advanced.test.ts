@@ -1,10 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createChunkPlayer } from "../../src/stretcher/chunk-player";
-import {
-  createMockAudioContext,
-  type MockAudioContext,
-  type MockAudioBufferSourceNode,
-} from "../helpers/audio-mocks";
+import { createMockAudioContext, type MockAudioContext } from "../helpers/audio-mocks";
 
 describe("createChunkPlayer – advanced", () => {
   let ctx: MockAudioContext;

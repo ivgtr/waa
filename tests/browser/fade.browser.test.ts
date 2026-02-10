@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { fadeIn, fadeOut, crossfade } from "../../src/fade";
+import { afterEach, describe, expect, it } from "vitest";
+import { crossfade, fadeIn, fadeOut } from "../../src/fade";
 
 describe("fade — browser", () => {
   let ctx: AudioContext;

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createPriorityQueue } from "../../src/stretcher/priority-queue";
 
 describe("createPriorityQueue", () => {
@@ -63,9 +63,7 @@ describe("createPriorityQueue", () => {
   });
 
   it("rebuild restores heap property after mutation", () => {
-    const q = createPriorityQueue<{ val: number; pri: number }>(
-      (a, b) => a.pri - b.pri,
-    );
+    const q = createPriorityQueue<{ val: number; pri: number }>((a, b) => a.pri - b.pri);
 
     const items = [
       { val: 1, pri: 10 },

@@ -15,12 +15,6 @@ export const TRANSITION_MARGIN_MS = 50;
  * @param currentTime - The current AudioContext time
  * @returns Delay in milliseconds (always >= 0)
  */
-export function calcTransitionDelay(
-  startTime: number,
-  currentTime: number,
-): number {
-  return Math.max(
-    0,
-    (startTime - currentTime) * 1000 + TRANSITION_MARGIN_MS,
-  );
+export function calcTransitionDelay(startTime: number, currentTime: number): number {
+  return Math.max(0, (startTime - currentTime) * 1000 + TRANSITION_MARGIN_MS);
 }

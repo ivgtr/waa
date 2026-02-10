@@ -1,9 +1,5 @@
-import { describe, it, expect } from "vitest";
-import {
-  createHannWindow,
-  findBestOffset,
-  wsolaTimeStretch,
-} from "../../src/stretcher/wsola";
+import { describe, expect, it } from "vitest";
+import { createHannWindow, findBestOffset, wsolaTimeStretch } from "../../src/stretcher/wsola";
 
 describe("createHannWindow", () => {
   it("returns a Float32Array of the given size", () => {
@@ -65,11 +61,7 @@ describe("findBestOffset", () => {
 });
 
 describe("wsolaTimeStretch", () => {
-  function createSineWave(
-    freq: number,
-    sampleRate: number,
-    durationSec: number,
-  ): Float32Array {
+  function createSineWave(freq: number, sampleRate: number, durationSec: number): Float32Array {
     const length = Math.round(sampleRate * durationSec);
     const data = new Float32Array(length);
     for (let i = 0; i < length; i++) {
@@ -78,10 +70,7 @@ describe("wsolaTimeStretch", () => {
     return data;
   }
 
-  function estimatePeakFrequency(
-    signal: Float32Array,
-    sampleRate: number,
-  ): number {
+  function estimatePeakFrequency(signal: Float32Array, sampleRate: number): number {
     // Simple zero-crossing based frequency estimation
     let crossings = 0;
     for (let i = 1; i < signal.length; i++) {
@@ -100,11 +89,7 @@ describe("wsolaTimeStretch", () => {
   });
 
   it("returns empty arrays for zero-length channels", () => {
-    const result = wsolaTimeStretch(
-      [new Float32Array(0)],
-      1.5,
-      44100,
-    );
+    const result = wsolaTimeStretch([new Float32Array(0)], 1.5, 44100);
     expect(result.output).toHaveLength(1);
     expect(result.output[0]!.length).toBe(0);
   });

@@ -26,11 +26,7 @@ import type {
  * pb.dispose();
  * ```
  */
-export function play(
-  ctx: AudioContext,
-  buffer: AudioBuffer,
-  options?: PlayOptions,
-): Playback {
+export function play(ctx: AudioContext, buffer: AudioBuffer, options?: PlayOptions): Playback {
   const { preservePitch = true } = options ?? {};
 
   // ----- Pitch-preserving mode (WSOLA-based time-stretch) -----
@@ -132,19 +128,8 @@ export function play(
 
   function getCurrentTime(): number {
     const state = sm.getState();
-    const elapsed =
-      state === "playing"
-        ? (ctx.currentTime - startedAt) * currentRate
-        : 0;
-    return calcPlaybackPosition(
-      state,
-      elapsed,
-      duration,
-      pausedAt,
-      isLooping,
-      loopStart,
-      loopEnd,
-    );
+    const elapsed = state === "playing" ? (ctx.currentTime - startedAt) * currentRate : 0;
+    return calcPlaybackPosition(state, elapsed, duration, pausedAt, isLooping, loopStart, loopEnd);
   }
 
   function pause() {
@@ -266,8 +251,7 @@ function createStretchedPlayback(
   const emitter = createEmitter<PlaybackEventMap>();
   const duration = buffer.duration;
 
-  let engineInstance: import("./stretcher/types.js").StretcherEngine | null =
-    null;
+  let engineInstance: import("./stretcher/types.js").StretcherEngine | null = null;
   let currentRate = initialRate > 0 ? initialRate : 1;
   let isLooping = loop;
   let pendingSeek: number | null = null;
@@ -289,72 +273,74 @@ function createStretchedPlayback(
   emitter.emit("play", undefined as never);
 
   // Fire-and-forget dynamic import of the stretcher engine
-  import("./stretcher/engine.js").then(({ createStretcherEngine }) => {
-    if (sm.isDisposed()) return;
-
-    engineInstance = createStretcherEngine(ctx, buffer, {
-      tempo: currentRate,
-      offset: initialOffset,
-      loop: isLooping,
-      through,
-      destination,
-      timeupdateInterval,
-    });
-
-    // Wire stretcher events to playback events
-    engineInstance.on("buffering", (data) => {
+  import("./stretcher/engine.js")
+    .then(({ createStretcherEngine }) => {
       if (sm.isDisposed()) return;
-      emitter.emit("buffering", data);
-    });
 
-    engineInstance.on("buffered", (data) => {
-      if (sm.isDisposed()) return;
-      emitter.emit("buffered", data);
-    });
+      engineInstance = createStretcherEngine(ctx, buffer, {
+        tempo: currentRate,
+        offset: initialOffset,
+        loop: isLooping,
+        through,
+        destination,
+        timeupdateInterval,
+      });
 
-    engineInstance.on("loop", () => {
-      if (sm.isDisposed()) return;
-      emitter.emit("loop", undefined as never);
-    });
+      // Wire stretcher events to playback events
+      engineInstance.on("buffering", (data) => {
+        if (sm.isDisposed()) return;
+        emitter.emit("buffering", data);
+      });
 
-    engineInstance.on("ended", () => {
+      engineInstance.on("buffered", (data) => {
+        if (sm.isDisposed()) return;
+        emitter.emit("buffered", data);
+      });
+
+      engineInstance.on("loop", () => {
+        if (sm.isDisposed()) return;
+        emitter.emit("loop", undefined as never);
+      });
+
+      engineInstance.on("ended", () => {
+        if (sm.isDisposed()) return;
+        if (sm.getState() === "stopped") return;
+        sm.stopTimer();
+        sm.setState("stopped");
+        emitter.emit("ended", undefined as never);
+      });
+
+      engineInstance.on("error", (data) => {
+        if (sm.isDisposed()) return;
+        if (data.fatal) {
+          sm.setState("stopped");
+          emitter.emit("ended", undefined as never);
+        }
+      });
+
+      // Start engine and timeupdate timer
+      engineInstance.start();
+      sm.startTimer();
+
+      // Apply pending seek if any
+      if (pendingSeek !== null) {
+        engineInstance.seek(pendingSeek);
+        pendingSeek = null;
+      }
+
+      // If we were paused before the engine loaded, pause it
+      if (sm.getState() === "paused") {
+        engineInstance.pause();
+      } else if (sm.getState() === "stopped") {
+        engineInstance.stop();
+      }
+    })
+    .catch(() => {
       if (sm.isDisposed()) return;
-      if (sm.getState() === "stopped") return;
       sm.stopTimer();
       sm.setState("stopped");
       emitter.emit("ended", undefined as never);
     });
-
-    engineInstance.on("error", (data) => {
-      if (sm.isDisposed()) return;
-      if (data.fatal) {
-        sm.setState("stopped");
-        emitter.emit("ended", undefined as never);
-      }
-    });
-
-    // Start engine and timeupdate timer
-    engineInstance.start();
-    sm.startTimer();
-
-    // Apply pending seek if any
-    if (pendingSeek !== null) {
-      engineInstance.seek(pendingSeek);
-      pendingSeek = null;
-    }
-
-    // If we were paused before the engine loaded, pause it
-    if (sm.getState() === "paused") {
-      engineInstance.pause();
-    } else if (sm.getState() === "stopped") {
-      engineInstance.stop();
-    }
-  }).catch(() => {
-    if (sm.isDisposed()) return;
-    sm.stopTimer();
-    sm.setState("stopped");
-    emitter.emit("ended", undefined as never);
-  });
 
   function getCurrentTime(): number {
     if (pendingSeek !== null) {

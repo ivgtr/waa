@@ -35,8 +35,7 @@ export function calcPositionInOriginalBuffer(p: PositionCalcParams): number {
   if (!p.chunk) return 0;
 
   // Nominal start time of this chunk in the original buffer
-  const nominalStartSample =
-    p.chunk.inputStartSample + p.chunk.overlapBefore;
+  const nominalStartSample = p.chunk.inputStartSample + p.chunk.overlapBefore;
   const nominalStartSec = nominalStartSample / p.sampleRate;
 
   // Subtract the crossfade overlap kept at the start of non-first chunks

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Enhanced mocks: capture individual Worker and AudioBufferSourceNode instances
@@ -36,10 +36,20 @@ vi.stubGlobal(
   }),
 );
 const OriginalURL = globalThis.URL;
-vi.stubGlobal("URL", Object.assign(
-  function MockURL(...args: ConstructorParameters<typeof URL>) { return new OriginalURL(...args); } as unknown as typeof URL,
-  { createObjectURL: vi.fn(() => "blob:mock"), revokeObjectURL: vi.fn(), prototype: OriginalURL.prototype, canParse: OriginalURL.canParse },
-));
+vi.stubGlobal(
+  "URL",
+  Object.assign(
+    function MockURL(...args: ConstructorParameters<typeof URL>) {
+      return new OriginalURL(...args);
+    } as unknown as typeof URL,
+    {
+      createObjectURL: vi.fn(() => "blob:mock"),
+      revokeObjectURL: vi.fn(),
+      prototype: OriginalURL.prototype,
+      canParse: OriginalURL.canParse,
+    },
+  ),
+);
 vi.stubGlobal("Blob", vi.fn());
 
 // ---------------------------------------------------------------------------
@@ -74,29 +84,23 @@ function createMockAudioContext() {
       connect: vi.fn(),
       disconnect: vi.fn(),
     })),
-    createBuffer: vi.fn(
-      (channels: number, length: number, sampleRate: number) => {
-        const channelData: Float32Array[] = [];
-        for (let i = 0; i < channels; i++) {
-          channelData.push(new Float32Array(length));
-        }
-        return {
-          numberOfChannels: channels,
-          length,
-          sampleRate,
-          duration: length / sampleRate,
-          getChannelData: (ch: number) => channelData[ch]!,
-        };
-      },
-    ),
+    createBuffer: vi.fn((channels: number, length: number, sampleRate: number) => {
+      const channelData: Float32Array[] = [];
+      for (let i = 0; i < channels; i++) {
+        channelData.push(new Float32Array(length));
+      }
+      return {
+        numberOfChannels: channels,
+        length,
+        sampleRate,
+        duration: length / sampleRate,
+        getChannelData: (ch: number) => channelData[ch]!,
+      };
+    }),
   } as unknown as AudioContext;
 }
 
-function createMockAudioBuffer(
-  durationSec: number,
-  sampleRate = 44100,
-  channels = 1,
-): AudioBuffer {
+function createMockAudioBuffer(durationSec: number, sampleRate = 44100, channels = 1): AudioBuffer {
   const length = Math.round(durationSec * sampleRate);
   const channelData: Float32Array[] = [];
   for (let i = 0; i < channels; i++) {
@@ -114,11 +118,7 @@ function createMockAudioBuffer(
 /**
  * Simulate a Worker result for a specific chunk on the given worker.
  */
-function simulateWorkerResult(
-  workerIndex: number,
-  chunkIndex: number,
-  outputLength: number,
-) {
+function simulateWorkerResult(workerIndex: number, chunkIndex: number, outputLength: number) {
   const worker = workerInstances[workerIndex];
   if (!worker?.onmessage) {
     throw new Error(`Worker ${workerIndex} has no onmessage handler`);
@@ -150,7 +150,7 @@ function findActiveSource() {
 // ---------------------------------------------------------------------------
 
 describe("playback lifecycle (chunk progression)", () => {
-  let createStretcherEngine: (typeof import("../../src/stretcher/engine"))["createStretcherEngine"];
+  let createStretcherEngine: typeof import("../../src/stretcher/engine")["createStretcherEngine"];
 
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -171,9 +171,9 @@ describe("playback lifecycle (chunk progression)", () => {
   // Chunk 2: inputStart=696780, inputEnd=1058400, overlap=(8820,0)  → nominal 705600–1058400
 
   // Worker が返す raw WSOLA 出力（trim 前）= 入力長（tempo=1.0）
-  const CHUNK0_RAW = 361620;  // nominal 8s + overlapAfter 0.2s
-  const CHUNK1_RAW = 370440;  // nominal 8s + overlap 0.2s × 2
-  const CHUNK2_RAW = 361620;  // nominal 8s + overlapBefore 0.2s
+  const CHUNK0_RAW = 361620; // nominal 8s + overlapAfter 0.2s
+  const CHUNK1_RAW = 370440; // nominal 8s + overlap 0.2s × 2
+  const CHUNK2_RAW = 361620; // nominal 8s + overlapBefore 0.2s
 
   // engine 内で trim 後に createBuffer に渡される長さ
   // Chunk 0: overlapBefore=0 → keepBefore=0, trimStart=0, trimEnd=8820 → 361620-0-8820=352800
@@ -211,8 +211,7 @@ describe("playback lifecycle (chunk progression)", () => {
     src!.onended!();
 
     // chunk 1 が再生されるはず（trim 後の長さ）
-    const latestLen =
-      createBufferMock.mock.calls[createBufferMock.mock.calls.length - 1][1];
+    const latestLen = createBufferMock.mock.calls[createBufferMock.mock.calls.length - 1][1];
     expect(latestLen).toBe(CHUNK1_TRIMMED);
     expect(engine.getStatus().phase).toBe("playing");
 
@@ -246,8 +245,7 @@ describe("playback lifecycle (chunk progression)", () => {
     const callsAfterLookahead = createBufferMock.mock.calls.length;
     expect(callsAfterLookahead).toBeGreaterThan(callsBefore);
     // scheduleNext で作られた buffer は chunk 1 の trim 後の長さ
-    const scheduledLen =
-      createBufferMock.mock.calls[callsAfterLookahead - 1][1];
+    const scheduledLen = createBufferMock.mock.calls[callsAfterLookahead - 1][1];
     expect(scheduledLen).toBe(CHUNK1_TRIMMED);
 
     // --- Transition setTimeout 発火 ---

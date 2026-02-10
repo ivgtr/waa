@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // --- Mock all delegated modules ---
 
@@ -91,16 +91,16 @@ function mockAudioContext() {
 
 // --- Import after mocks ---
 
-import { WaaPlayer } from "../src/player.js";
-import * as contextMod from "../src/context.js";
+import * as adaptersMod from "../src/adapters.js";
 import * as bufferMod from "../src/buffer.js";
-import * as playMod from "../src/play.js";
-import * as nodesMod from "../src/nodes.js";
-import * as waveformMod from "../src/waveform.js";
+import * as contextMod from "../src/context.js";
 import * as fadeMod from "../src/fade.js";
+import * as nodesMod from "../src/nodes.js";
+import * as playMod from "../src/play.js";
+import { WaaPlayer } from "../src/player.js";
 import * as schedulerMod from "../src/scheduler.js";
 import * as synthMod from "../src/synth.js";
-import * as adaptersMod from "../src/adapters.js";
+import * as waveformMod from "../src/waveform.js";
 
 // ---------------------------------------------------------------------------
 // Constructor
@@ -194,20 +194,13 @@ describe("Buffer delegation", () => {
   it("load() delegates to loadBuffer with ctx", async () => {
     const opts = { onProgress: vi.fn() };
     await player.load("test.mp3", opts);
-    expect(bufferMod.loadBuffer).toHaveBeenCalledWith(
-      player.ctx,
-      "test.mp3",
-      opts,
-    );
+    expect(bufferMod.loadBuffer).toHaveBeenCalledWith(player.ctx, "test.mp3", opts);
   });
 
   it("loadFromBlob() delegates to loadBufferFromBlob", async () => {
     const blob = {} as Blob;
     await player.loadFromBlob(blob);
-    expect(bufferMod.loadBufferFromBlob).toHaveBeenCalledWith(
-      player.ctx,
-      blob,
-    );
+    expect(bufferMod.loadBufferFromBlob).toHaveBeenCalledWith(player.ctx, blob);
   });
 
   it("loadAll() delegates to loadBuffers", async () => {
@@ -399,10 +392,7 @@ describe("Scheduler delegation", () => {
   it("createScheduler() injects ctx", () => {
     const opts = { lookahead: 0.2 };
     player.createScheduler(opts);
-    expect(schedulerMod.createScheduler).toHaveBeenCalledWith(
-      player.ctx,
-      opts,
-    );
+    expect(schedulerMod.createScheduler).toHaveBeenCalledWith(player.ctx, opts);
   });
 
   it("createClock() injects ctx", () => {
@@ -425,11 +415,7 @@ describe("Synth delegation", () => {
 
   it("createSineBuffer() injects ctx", () => {
     player.createSineBuffer(440, 1);
-    expect(synthMod.createSineBuffer).toHaveBeenCalledWith(
-      player.ctx,
-      440,
-      1,
-    );
+    expect(synthMod.createSineBuffer).toHaveBeenCalledWith(player.ctx, 440, 1);
   });
 
   it("createNoiseBuffer() injects ctx", () => {
@@ -439,11 +425,7 @@ describe("Synth delegation", () => {
 
   it("createClickBuffer() injects ctx", () => {
     player.createClickBuffer(1000, 0.01);
-    expect(synthMod.createClickBuffer).toHaveBeenCalledWith(
-      player.ctx,
-      1000,
-      0.01,
-    );
+    expect(synthMod.createClickBuffer).toHaveBeenCalledWith(player.ctx, 1000, 0.01);
   });
 });
 

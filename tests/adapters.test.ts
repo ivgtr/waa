@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getSnapshot,
-  subscribeSnapshot,
   onFrame,
+  subscribeSnapshot,
   whenEnded,
   whenPosition,
 } from "../src/adapters.js";
-import { createMockPlayback } from "./helpers/audio-mocks.js";
 import type { Playback, PlaybackSnapshot } from "../src/types.js";
+import { createMockPlayback } from "./helpers/audio-mocks.js";
 
 describe("adapters", () => {
   // -------------------------------------------------------------------------
@@ -69,7 +69,12 @@ describe("adapters", () => {
     });
 
     it("updates cache before calling callback (snapshot is fresh)", () => {
-      const pb = createMockPlayback({ state: "playing", currentTime: 0, duration: 10, progress: 0 });
+      const pb = createMockPlayback({
+        state: "playing",
+        currentTime: 0,
+        duration: 10,
+        progress: 0,
+      });
       let capturedSnap: PlaybackSnapshot | null = null;
 
       subscribeSnapshot(pb as unknown as Playback, () => {
@@ -111,10 +116,13 @@ describe("adapters", () => {
     beforeEach(() => {
       rafCallbacks = [];
       rafIdCounter = 0;
-      vi.stubGlobal("requestAnimationFrame", vi.fn((cb: (time: number) => void) => {
-        rafCallbacks.push(cb);
-        return ++rafIdCounter;
-      }));
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        vi.fn((cb: (time: number) => void) => {
+          rafCallbacks.push(cb);
+          return ++rafIdCounter;
+        }),
+      );
       vi.stubGlobal("cancelAnimationFrame", vi.fn());
     });
 
@@ -123,7 +131,12 @@ describe("adapters", () => {
     });
 
     it("calls callback on each animation frame", () => {
-      const pb = createMockPlayback({ state: "playing", currentTime: 1, duration: 10, progress: 0.1 });
+      const pb = createMockPlayback({
+        state: "playing",
+        currentTime: 1,
+        duration: 10,
+        progress: 0.1,
+      });
       const callback = vi.fn();
 
       onFrame(pb as unknown as Playback, callback);

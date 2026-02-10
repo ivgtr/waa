@@ -3,15 +3,15 @@
 // ---------------------------------------------------------------------------
 
 import {
-  PRIORITY_FORWARD_WEIGHT,
-  PRIORITY_BACKWARD_WEIGHT,
   CANCEL_DISTANCE_THRESHOLD,
-  MAX_CHUNK_RETRIES,
+  CHUNK_DURATION_SEC,
   KEEP_AHEAD_CHUNKS,
   KEEP_AHEAD_SECONDS,
   KEEP_BEHIND_CHUNKS,
   KEEP_BEHIND_SECONDS,
-  CHUNK_DURATION_SEC,
+  MAX_CHUNK_RETRIES,
+  PRIORITY_BACKWARD_WEIGHT,
+  PRIORITY_FORWARD_WEIGHT,
 } from "./constants.js";
 import { createPriorityQueue } from "./priority-queue.js";
 import type {
@@ -41,16 +41,13 @@ export function createConversionScheduler(
 ): ConversionScheduler {
   const forwardWeight = options?.forwardWeight ?? PRIORITY_FORWARD_WEIGHT;
   const backwardWeight = options?.backwardWeight ?? PRIORITY_BACKWARD_WEIGHT;
-  const cancelDistThreshold =
-    options?.cancelDistanceThreshold ?? CANCEL_DISTANCE_THRESHOLD;
-  const keepAhead = options?.keepAheadChunks ?? Math.max(
-    KEEP_AHEAD_CHUNKS,
-    Math.ceil(KEEP_AHEAD_SECONDS / CHUNK_DURATION_SEC),
-  );
-  const keepBehind = options?.keepBehindChunks ?? Math.max(
-    KEEP_BEHIND_CHUNKS,
-    Math.ceil(KEEP_BEHIND_SECONDS / CHUNK_DURATION_SEC),
-  );
+  const cancelDistThreshold = options?.cancelDistanceThreshold ?? CANCEL_DISTANCE_THRESHOLD;
+  const keepAhead =
+    options?.keepAheadChunks ??
+    Math.max(KEEP_AHEAD_CHUNKS, Math.ceil(KEEP_AHEAD_SECONDS / CHUNK_DURATION_SEC));
+  const keepBehind =
+    options?.keepBehindChunks ??
+    Math.max(KEEP_BEHIND_CHUNKS, Math.ceil(KEEP_BEHIND_SECONDS / CHUNK_DURATION_SEC));
 
   function isInActiveWindow(chunkIndex: number, playheadIndex: number): boolean {
     const dist = chunkIndex - playheadIndex;
@@ -62,9 +59,7 @@ export function createConversionScheduler(
   let previousTempoCache: TempoCache | null = null;
   let disposed = false;
 
-  const queue = createPriorityQueue<ChunkInfo>(
-    (a, b) => a.priority - b.priority,
-  );
+  const queue = createPriorityQueue<ChunkInfo>((a, b) => a.priority - b.priority);
 
   function calcPriority(chunkIndex: number, playheadIndex: number): number {
     const distance = chunkIndex - playheadIndex;
@@ -79,11 +74,7 @@ export function createConversionScheduler(
     queue.clear();
 
     for (const chunk of chunks) {
-      if (
-        chunk.state === "pending" ||
-        chunk.state === "queued" ||
-        chunk.state === "failed"
-      ) {
+      if (chunk.state === "pending" || chunk.state === "queued" || chunk.state === "failed") {
         chunk.priority = calcPriority(chunk.index, playheadIndex);
         chunk.state = "queued";
         queue.enqueue(chunk);
@@ -126,12 +117,7 @@ export function createConversionScheduler(
 
       nextChunk.state = "converting";
       const data = extractChunkData(nextChunk.index);
-      workerManager.postConvert(
-        nextChunk.index,
-        data,
-        currentTempo,
-        sampleRate,
-      );
+      workerManager.postConvert(nextChunk.index, data, currentTempo, sampleRate);
     }
   }
 

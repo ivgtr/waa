@@ -1,10 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  stubWorkerGlobals,
-  createMockAudioContext,
   createMockAudioBuffer,
-  findActiveSource,
+  createMockAudioContext,
   type MockAudioContext,
+  stubWorkerGlobals,
 } from "../helpers/audio-mocks";
 
 const workerStubs = stubWorkerGlobals();
@@ -14,7 +13,7 @@ const CHUNK0_RAW = 361620;
 const CHUNK1_RAW = 370440;
 const CHUNK2_RAW = 361620;
 
-let createStretcherEngine: (typeof import("../../src/stretcher/engine"))["createStretcherEngine"];
+let createStretcherEngine: typeof import("../../src/stretcher/engine")["createStretcherEngine"];
 
 describe("engine – exitBuffering paths", () => {
   let ctx: MockAudioContext;

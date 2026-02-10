@@ -25,10 +25,7 @@ export function createSineBuffer(
 /**
  * Create an `AudioBuffer` containing white noise.
  */
-export function createNoiseBuffer(
-  ctx: AudioContext,
-  duration: number,
-): AudioBuffer {
+export function createNoiseBuffer(ctx: AudioContext, duration: number): AudioBuffer {
   const length = Math.ceil(ctx.sampleRate * duration);
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
   const data = buffer.getChannelData(0);
@@ -55,8 +52,7 @@ export function createClickBuffer(
   for (let i = 0; i < length; i++) {
     // Exponential decay envelope.
     const envelope = Math.exp((-5 * i) / length);
-    data[i] =
-      envelope * Math.sin((2 * Math.PI * frequency * i) / ctx.sampleRate);
+    data[i] = envelope * Math.sin((2 * Math.PI * frequency * i) / ctx.sampleRate);
   }
 
   return buffer;

@@ -1,18 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  createGain,
-  rampGain,
+  chain,
   createAnalyser,
+  createCompressor,
+  createFilter,
+  createGain,
+  createPanner,
+  disconnectChain,
   getFrequencyData,
   getFrequencyDataByte,
-  createFilter,
-  createPanner,
-  createCompressor,
-  chain,
-  disconnectChain,
+  rampGain,
 } from "../src/nodes.js";
-import { createMockAudioContext } from "./helpers/audio-mocks.js";
 import type { MockAnalyserNode } from "./helpers/audio-mocks.js";
+import { createMockAudioContext } from "./helpers/audio-mocks.js";
 
 describe("nodes", () => {
   // -------------------------------------------------------------------------
@@ -178,11 +178,7 @@ describe("nodes", () => {
       const g1 = createGain(ctx);
       const g2 = createGain(ctx);
       const g3 = createGain(ctx);
-      chain(
-        g1 as unknown as AudioNode,
-        g2 as unknown as AudioNode,
-        g3 as unknown as AudioNode,
-      );
+      chain(g1 as unknown as AudioNode, g2 as unknown as AudioNode, g3 as unknown as AudioNode);
       expect(g1.connect).toHaveBeenCalledWith(g2);
       expect(g2.connect).toHaveBeenCalledWith(g3);
     });

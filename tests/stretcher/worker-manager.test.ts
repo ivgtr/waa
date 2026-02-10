@@ -1,8 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  stubWorkerGlobals,
-  type MockWorker,
-} from "../helpers/audio-mocks";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubWorkerGlobals } from "../helpers/audio-mocks";
 
 // ---------------------------------------------------------------------------
 // Setup Worker stubs
@@ -14,7 +11,7 @@ const workerStubs = stubWorkerGlobals();
 // Tests
 // ---------------------------------------------------------------------------
 
-let createWorkerManager: (typeof import("../../src/stretcher/worker-manager"))["createWorkerManager"];
+let createWorkerManager: typeof import("../../src/stretcher/worker-manager")["createWorkerManager"];
 
 describe("createWorkerManager", () => {
   let onResult: ReturnType<typeof vi.fn>;
@@ -48,9 +45,12 @@ describe("createWorkerManager", () => {
     it("calls onAllDead if all workers fail to spawn", () => {
       // Make Worker constructor throw
       const originalWorker = globalThis.Worker;
-      vi.stubGlobal("Worker", vi.fn(function MockWorkerCtor() {
-        throw new Error("Worker not supported");
-      }));
+      vi.stubGlobal(
+        "Worker",
+        vi.fn(function MockWorkerCtor() {
+          throw new Error("Worker not supported");
+        }),
+      );
 
       const onAllDead = vi.fn();
       createWorkerManager(onResult, onError, 3, 2, onAllDead);
@@ -299,9 +299,7 @@ describe("createWorkerManager", () => {
       );
       // Worker 1 should not receive cancel
       const worker1PostCalls = workerStubs.workers[startIdx + 1]!.postMessage.mock.calls;
-      const cancelCalls = worker1PostCalls.filter(
-        (call: any) => call[0]?.type === "cancel",
-      );
+      const cancelCalls = worker1PostCalls.filter((call: any) => call[0]?.type === "cancel");
       expect(cancelCalls.length).toBe(0);
     });
 

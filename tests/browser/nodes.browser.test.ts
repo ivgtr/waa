@@ -1,13 +1,13 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
-  createGain,
-  rampGain,
-  createAnalyser,
-  createFilter,
-  createPanner,
-  createCompressor,
   chain,
+  createAnalyser,
+  createCompressor,
+  createFilter,
+  createGain,
+  createPanner,
   disconnectChain,
+  rampGain,
 } from "../../src/nodes";
 import { createSineBuffer } from "../../src/synth";
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { createContext, resumeContext, ensureRunning, now } from "../../src/context";
+import { afterEach, describe, expect, it } from "vitest";
+import { createContext, ensureRunning, now, resumeContext } from "../../src/context";
 
 describe("context — browser", () => {
   let ctx: AudioContext | null = null;

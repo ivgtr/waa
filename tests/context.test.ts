@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { createContext, resumeContext, ensureRunning, now } from "../src/context.js";
+import { describe, expect, it } from "vitest";
+import { createContext, ensureRunning, now, resumeContext } from "../src/context.js";
 import { createMockAudioContext } from "./helpers/audio-mocks.js";
 
 describe("context", () => {
@@ -21,7 +21,9 @@ describe("context", () => {
   describe("resumeContext", () => {
     it("calls resume() when state is suspended", async () => {
       const ctx = createMockAudioContext();
-      (ctx as unknown as { _setState: (s: string) => void })._setState("suspended" as AudioContextState);
+      (ctx as unknown as { _setState: (s: string) => void })._setState(
+        "suspended" as AudioContextState,
+      );
       await resumeContext(ctx);
       expect(ctx.resume).toHaveBeenCalled();
     });
@@ -39,7 +41,9 @@ describe("context", () => {
   describe("ensureRunning", () => {
     it("calls resume() when state is not running", async () => {
       const ctx = createMockAudioContext();
-      (ctx as unknown as { _setState: (s: string) => void })._setState("suspended" as AudioContextState);
+      (ctx as unknown as { _setState: (s: string) => void })._setState(
+        "suspended" as AudioContextState,
+      );
       await ensureRunning(ctx);
       expect(ctx.resume).toHaveBeenCalled();
     });
@@ -52,7 +56,9 @@ describe("context", () => {
 
     it("calls resume() when state is closed", async () => {
       const ctx = createMockAudioContext();
-      (ctx as unknown as { _setState: (s: string) => void })._setState("closed" as AudioContextState);
+      (ctx as unknown as { _setState: (s: string) => void })._setState(
+        "closed" as AudioContextState,
+      );
       await ensureRunning(ctx);
       expect(ctx.resume).toHaveBeenCalled();
     });

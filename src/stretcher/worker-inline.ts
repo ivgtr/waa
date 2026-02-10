@@ -5,11 +5,7 @@
 // for execution inside a Web Worker. The logic mirrors wsola.ts.
 // ---------------------------------------------------------------------------
 
-import {
-  WSOLA_FRAME_SIZE,
-  WSOLA_HOP_SIZE,
-  WSOLA_TOLERANCE,
-} from "./constants.js";
+import { WSOLA_FRAME_SIZE, WSOLA_HOP_SIZE, WSOLA_TOLERANCE } from "./constants.js";
 
 function getWorkerCode(): string {
   // Embed constants directly into the worker code

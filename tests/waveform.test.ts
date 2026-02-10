@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { extractPeaks, extractPeakPairs, extractRMS } from "../src/waveform.js";
+import { describe, expect, it } from "vitest";
+import { extractPeakPairs, extractPeaks, extractRMS } from "../src/waveform.js";
 import { createMockAudioBuffer } from "./helpers/audio-mocks.js";
 
 /** Helper: create a buffer with known channel data. */

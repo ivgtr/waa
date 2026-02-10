@@ -78,13 +78,13 @@ export interface PlaybackSnapshot {
 
 /** Event map emitted by a Playback instance. */
 export interface PlaybackEventMap {
-  play: void;
-  pause: void;
-  resume: void;
+  play: undefined;
+  pause: undefined;
+  resume: undefined;
   seek: { position: number };
-  stop: void;
-  ended: void;
-  loop: void;
+  stop: undefined;
+  ended: undefined;
+  loop: undefined;
   statechange: { state: PlaybackState };
   timeupdate: { position: number; duration: number };
   buffering: { reason: "initial" | "seek" | "tempo-change" | "underrun" };

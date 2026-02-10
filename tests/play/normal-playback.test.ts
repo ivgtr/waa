@@ -1,10 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { play } from "../../src/play";
 import {
-  createMockAudioContext,
   createMockAudioBuffer,
+  createMockAudioContext,
   type MockAudioContext,
-  type MockAudioBufferSourceNode,
 } from "../helpers/audio-mocks";
 
 describe("play() – normal playback (preservePitch: false)", () => {
@@ -130,7 +129,9 @@ describe("play() – normal playback (preservePitch: false)", () => {
       const callsBefore = (ctx.createBufferSource as ReturnType<typeof vi.fn>).mock.calls.length;
       pb.pause();
       expect(pb.getState()).toBe("stopped");
-      expect((ctx.createBufferSource as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+      expect((ctx.createBufferSource as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
+        callsBefore,
+      );
       pb.dispose();
     });
 
@@ -139,7 +140,9 @@ describe("play() – normal playback (preservePitch: false)", () => {
       const callsBefore = (ctx.createBufferSource as ReturnType<typeof vi.fn>).mock.calls.length;
       pb.resume();
       expect(pb.getState()).toBe("playing");
-      expect((ctx.createBufferSource as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+      expect((ctx.createBufferSource as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
+        callsBefore,
+      );
       pb.dispose();
     });
   });

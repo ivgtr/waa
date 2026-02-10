@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createBufferMonitor } from "../../src/stretcher/buffer-monitor";
 import type { ChunkInfo } from "../../src/stretcher/types";
 

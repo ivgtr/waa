@@ -112,9 +112,7 @@ export function wsolaTimeStretch(
   }
 
   const estimatedOutputLength = (numFrames - 1) * synthesisHop + frameSize;
-  const outputChannels = channels.map(
-    () => new Float32Array(estimatedOutputLength),
-  );
+  const outputChannels = channels.map(() => new Float32Array(estimatedOutputLength));
   const windowFunc = createHannWindow(frameSize);
 
   // Normalization buffer for overlap-add
@@ -149,16 +147,10 @@ export function wsolaTimeStretch(
         const overlapStart = frameSize - synthesisHop;
         const overlapSize = Math.min(synthesisHop, frameSize - overlapStart);
 
-        const refSlice = refChannel.subarray(
-          overlapStart,
-          overlapStart + overlapSize,
-        );
+        const refSlice = refChannel.subarray(overlapStart, overlapStart + overlapSize);
 
         // Search buffer: extract the region to search in
-        const searchSlice = inputChannel.subarray(
-          searchStart,
-          searchEnd + overlapSize,
-        );
+        const searchSlice = inputChannel.subarray(searchStart, searchEnd + overlapSize);
 
         const bestOffset = findBestOffset(
           refSlice,
@@ -213,9 +205,7 @@ export function wsolaTimeStretch(
   }
 
   // Trim output to actual length
-  const trimmedOutput = outputChannels.map((ch) =>
-    ch.subarray(0, actualOutputLength),
-  );
+  const trimmedOutput = outputChannels.map((ch) => ch.subarray(0, actualOutputLength));
 
   return { output: trimmedOutput, length: actualOutputLength };
 }
