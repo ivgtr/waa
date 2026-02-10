@@ -49,6 +49,22 @@ describe("calcPositionInOriginalBuffer", () => {
     expect(result).toBe(0);
   });
 
+  it("returns bufferingResumePosition when phase is paused and resume position is set", () => {
+    expect(
+      calcPositionInOriginalBuffer(
+        makeParams({ phase: "paused", bufferingResumePosition: 5.0 }),
+      ),
+    ).toBe(5.0);
+  });
+
+  it("falls through when phase is paused but bufferingResumePosition is null", () => {
+    const result = calcPositionInOriginalBuffer(
+      makeParams({ phase: "paused", bufferingResumePosition: null, posInChunk: 2.0 }),
+    );
+    // Falls through to chunk-based calculation
+    expect(result).toBe(2.0);
+  });
+
   // --- chunk === null / undefined ---
 
   it("returns 0 when chunk is null (defensive)", () => {

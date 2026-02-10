@@ -475,6 +475,80 @@ describe("engine – advanced paths", () => {
       engine.dispose();
     });
 
+    it("pause → setTempo → getCurrentPosition does not shift", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      const posBeforePause = engine.getCurrentPosition();
+      engine.pause();
+      const posAfterPause = engine.getCurrentPosition();
+
+      engine.setTempo(2.0);
+      const posAfterSetTempo = engine.getCurrentPosition();
+
+      // Position should not shift after setTempo during pause
+      expect(posAfterSetTempo).toBeCloseTo(posAfterPause, 3);
+      expect(posAfterSetTempo).toBeCloseTo(posBeforePause, 3);
+
+      engine.dispose();
+    });
+
+    it("pause → multiple setTempo → getCurrentPosition stays stable", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.pause();
+      const posAfterPause = engine.getCurrentPosition();
+
+      engine.setTempo(1.5);
+      expect(engine.getCurrentPosition()).toBeCloseTo(posAfterPause, 3);
+
+      engine.setTempo(2.0);
+      expect(engine.getCurrentPosition()).toBeCloseTo(posAfterPause, 3);
+
+      engine.setTempo(3.0);
+      expect(engine.getCurrentPosition()).toBeCloseTo(posAfterPause, 3);
+
+      engine.dispose();
+    });
+
+    it("pause → setTempo → resume resumes from correct position", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      const posBeforePause = engine.getCurrentPosition();
+      engine.pause();
+
+      engine.setTempo(2.0);
+      engine.resume();
+
+      // Should enter buffering for tempo-change
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // Provide new chunks at new tempo
+      workerStubs.simulateWorkerResult(0, 0, Math.round(CHUNK0_RAW / 2));
+      workerStubs.simulateWorkerResult(1, 1, Math.round(CHUNK1_RAW / 2));
+
+      expect(engine.getStatus().phase).toBe("playing");
+      // Position after resume should be close to the position before pause
+      const posAfterResume = engine.getCurrentPosition();
+      expect(posAfterResume).toBeCloseTo(posBeforePause, 1);
+
+      engine.dispose();
+    });
+
     it("setTempo to same value during pause does not trigger buffering on resume", () => {
       const engine = createEngine(ctx, buffer, { tempo: 1.0 });
       const bufferingHandler = vi.fn();

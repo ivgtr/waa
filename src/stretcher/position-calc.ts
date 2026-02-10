@@ -28,7 +28,7 @@ export interface PositionCalcParams {
 export function calcPositionInOriginalBuffer(p: PositionCalcParams): number {
   if (p.phase === "ended") return p.totalDuration;
   if (p.phase === "waiting") return p.offset;
-  if (p.phase === "buffering" && p.bufferingResumePosition !== null) {
+  if ((p.phase === "buffering" || p.phase === "paused") && p.bufferingResumePosition !== null) {
     return p.bufferingResumePosition;
   }
 

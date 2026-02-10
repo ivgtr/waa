@@ -525,8 +525,7 @@ export function createStretcherEngine(
 
     if (pendingTempoChange) {
       pendingTempoChange = false;
-      bufferingResumePosition = getPositionInOriginalBuffer();
-      currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition, sampleRate);
+      currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition!, sampleRate);
       enterBuffering("tempo-change");
       scheduler.updatePriorities(currentChunkIndex);
       scheduler.handleTempoChange(currentTempo);
@@ -594,6 +593,9 @@ export function createStretcherEngine(
     if (disposed || phase === "ended" || newTempo === currentTempo) return;
 
     if (phase === "paused") {
+      if (!pendingTempoChange) {
+        bufferingResumePosition = getPositionInOriginalBuffer();
+      }
       currentTempo = newTempo;
       pendingTempoChange = true;
       return;
