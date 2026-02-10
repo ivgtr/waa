@@ -1,6 +1,6 @@
 {
   "name": "waa-play",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Web Audio API modules with WSOLA time-stretching, chunk-based streaming, and waveform extraction",
   "type": "module",
   "main": "./dist/index.cjs",
