@@ -126,6 +126,7 @@ export function createConversionScheduler(
     outputData: Float32Array[],
     outputLength: number,
   ): void {
+    if (disposed) return;
     const chunk = chunks[chunkIndex];
     if (!chunk) return;
     if (chunk.state !== "converting") {
@@ -140,6 +141,7 @@ export function createConversionScheduler(
   }
 
   function handleError(chunkIndex: number, error: string): void {
+    if (disposed) return;
     const chunk = chunks[chunkIndex];
     if (!chunk) return;
 

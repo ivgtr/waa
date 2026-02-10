@@ -358,4 +358,167 @@ describe("createConversionScheduler – advanced", () => {
 
     scheduler.dispose();
   });
+
+  // -----------------------------------------------------------------------
+  // CS-04: dispose 後の handleResult / handleError
+  // -----------------------------------------------------------------------
+
+  it("CS-04: handleResult after dispose does not call onChunkReady", () => {
+    const chunks = makeChunks(3);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+    const onReady = vi.fn();
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      undefined,
+      onReady,
+    );
+
+    scheduler.start(0);
+    expect(chunks[0]!.state).toBe("converting");
+
+    scheduler.dispose();
+
+    // Result arrives after dispose
+    expect(() => {
+      (scheduler as any)._handleResult(0, [new Float32Array(1024)], 1024);
+    }).not.toThrow();
+    expect(onReady).not.toHaveBeenCalled();
+    // chunk state should NOT be set to "ready"
+    expect(chunks[0]!.state).not.toBe("ready");
+  });
+
+  it("CS-04: handleError after dispose does not call onChunkFailed", () => {
+    const chunks = makeChunks(3);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+    const onFailed = vi.fn();
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      undefined,
+      undefined,
+      onFailed,
+    );
+
+    scheduler.start(0);
+    // Fail chunk 0 twice first to get close to max retries
+    wm.simulateResult(0);
+    (scheduler as any)._handleError(0, "error");
+    wm.simulateResult(0);
+    (scheduler as any)._handleError(0, "error");
+
+    scheduler.dispose();
+
+    // Third error after dispose — would trigger onChunkFailed without guard
+    expect(() => {
+      (scheduler as any)._handleError(0, "error");
+    }).not.toThrow();
+    expect(onFailed).not.toHaveBeenCalled();
+  });
+
+  // -----------------------------------------------------------------------
+  // CS-01: handleResult when chunk state is "failed"
+  // -----------------------------------------------------------------------
+
+  it("CS-01: handleResult skips chunk in failed state", () => {
+    const chunks = makeChunks(3);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+    const onReady = vi.fn();
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      undefined,
+      onReady,
+    );
+
+    scheduler.start(0);
+    // Manually set chunk 0 to "failed" (simulating max retries reached)
+    chunks[0]!.state = "failed";
+
+    (scheduler as any)._handleResult(0, [new Float32Array(1024)], 1024);
+
+    // Should not become "ready"
+    expect(chunks[0]!.state).not.toBe("ready");
+    expect(onReady).not.toHaveBeenCalled();
+
+    scheduler.dispose();
+  });
+
+  // -----------------------------------------------------------------------
+  // CS-02: handleResult when chunk state is "evicted"
+  // -----------------------------------------------------------------------
+
+  it("CS-02: handleResult skips chunk in evicted state", () => {
+    const chunks = makeChunks(3);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+    const onReady = vi.fn();
+
+    const scheduler = createConversionScheduler(
+      chunks,
+      wm,
+      extractData,
+      44100,
+      1.0,
+      undefined,
+      onReady,
+    );
+
+    scheduler.start(0);
+    // Manually set chunk 0 to "evicted"
+    chunks[0]!.state = "evicted";
+
+    (scheduler as any)._handleResult(0, [new Float32Array(1024)], 1024);
+
+    // Should not become "ready"
+    expect(chunks[0]!.state).not.toBe("ready");
+    expect(onReady).not.toHaveBeenCalled();
+
+    scheduler.dispose();
+  });
+
+  // -----------------------------------------------------------------------
+  // L-02: dispose 後の previousTempoCache
+  // -----------------------------------------------------------------------
+
+  it("L-02: dispose clears queue and subsequent restorePreviousTempo is safe", () => {
+    const chunks = makeChunks(3);
+    const wm = createMockWorkerManager();
+    const extractData = vi.fn(() => [new Float32Array(1024)]);
+
+    const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
+
+    scheduler.start(0);
+
+    // Complete chunks
+    const buf = [new Float32Array(1024)];
+    for (let i = 0; i < 3; i++) {
+      wm.simulateResult(i);
+      (scheduler as any)._handleResult(i, buf, 1024);
+    }
+
+    // Tempo change to create cache
+    scheduler.handleTempoChange(2.0);
+
+    scheduler.dispose();
+
+    // Operations after dispose should not throw
+    expect(() => scheduler.restorePreviousTempo()).not.toThrow();
+    expect(() => scheduler.dispatchNext()).not.toThrow();
+  });
 });
