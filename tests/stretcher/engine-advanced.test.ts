@@ -294,12 +294,106 @@ describe("engine – advanced paths", () => {
       engine.setTempo(2.0);
       expect(engine.getStatus().phase).toBe("buffering");
 
+      // Wait for debounced handleTempoChange to fire
+      vi.advanceTimersByTime(100);
+
       // New worker results arrive at new tempo
       workerStubs.simulateWorkerResult(0, 0, Math.round(CHUNK0_RAW / 2));
       workerStubs.simulateWorkerResult(1, 1, Math.round(CHUNK1_RAW / 2));
 
       // Should exit buffering
       expect(engine.getStatus().phase).toBe("playing");
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // setTempo – debounce
+  // -----------------------------------------------------------------------
+
+  describe("setTempo – debounce", () => {
+    it("rapid setTempo calls trigger buffering only once", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+      const bufferingHandler = vi.fn();
+      engine.on("buffering", bufferingHandler);
+
+      engine.start();
+
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      expect(engine.getStatus().phase).toBe("playing");
+      bufferingHandler.mockClear();
+
+      // Rapid tempo changes
+      engine.setTempo(1.2);
+      engine.setTempo(1.5);
+      engine.setTempo(1.8);
+      engine.setTempo(2.0);
+      engine.setTempo(2.5);
+
+      // Only 1 buffering event (from the first call in the burst)
+      const tempoChangeBufferings = bufferingHandler.mock.calls.filter(
+        (call: any) => call[0].reason === "tempo-change",
+      );
+      expect(tempoChangeBufferings).toHaveLength(1);
+
+      engine.dispose();
+    });
+
+    it("debounced setTempo applies final tempo to scheduler", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+
+      engine.start();
+
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Rapid tempo changes
+      engine.setTempo(1.5);
+      engine.setTempo(2.0);
+      engine.setTempo(2.5);
+
+      // Tempo should be updated immediately (for getStatus)
+      expect(engine.getStatus().playback.tempo).toBe(2.5);
+
+      // Fire the debounce timer
+      vi.advanceTimersByTime(100);
+
+      // After debounce, workers should be re-dispatched
+      // Simulate results at final tempo
+      workerStubs.simulateWorkerResult(0, 0, Math.round(CHUNK0_RAW / 2.5));
+      workerStubs.simulateWorkerResult(1, 1, Math.round(CHUNK1_RAW / 2.5));
+
+      // Should exit buffering and play at new tempo
+      expect(engine.getStatus().phase).toBe("playing");
+      expect(engine.getStatus().playback.tempo).toBe(2.5);
+
+      engine.dispose();
+    });
+
+    it("single setTempo still triggers buffering immediately", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+      const bufferingHandler = vi.fn();
+      engine.on("buffering", bufferingHandler);
+
+      engine.start();
+
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      expect(engine.getStatus().phase).toBe("playing");
+      bufferingHandler.mockClear();
+
+      // Single setTempo
+      engine.setTempo(2.0);
+
+      // Buffering should fire immediately
+      expect(bufferingHandler).toHaveBeenCalledWith({ reason: "tempo-change" });
+      expect(engine.getStatus().phase).toBe("buffering");
 
       engine.dispose();
     });
@@ -481,6 +575,49 @@ describe("engine – advanced paths", () => {
   });
 
   // -----------------------------------------------------------------------
+  // onTransition – race with advanceToNextChunk
+  // -----------------------------------------------------------------------
+
+  describe("onTransition – race with advanceToNextChunk", () => {
+    it("does not double-increment currentChunkIndex", () => {
+      const engine = createEngine(ctx, buffer, { loop: false });
+
+      engine.start();
+
+      // Make all chunks ready
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+
+      expect(engine.getStatus().phase).toBe("playing");
+      expect(engine.getSnapshot().currentChunkIndex).toBe(0);
+
+      // Get chunk 0's source before transition
+      const src0 = findActiveSource(ctx._sources);
+      expect(src0).toBeDefined();
+
+      // Advance time close to end of chunk 0 → lookahead fires → scheduleNext
+      ctx._setCurrentTime(7.8);
+      vi.advanceTimersByTime(200); // LOOKAHEAD_INTERVAL_MS
+
+      // Trigger onended on chunk 0's source:
+      // handleCurrentSourceEnded → nextSource exists → cancelTransition + doTransition → onTransition
+      src0!.onended!();
+
+      // currentChunkIndex should be exactly 1
+      expect(engine.getSnapshot().currentChunkIndex).toBe(1);
+
+      // Fire any remaining timers to ensure no stale transition causes double-increment
+      vi.advanceTimersByTime(5000);
+
+      // Still 1 — no double increment
+      expect(engine.getSnapshot().currentChunkIndex).toBe(1);
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Error handling
   // -----------------------------------------------------------------------
 
@@ -582,6 +719,96 @@ describe("engine – advanced paths", () => {
       engine.start();
 
       expect(bufferingHandler).toHaveBeenCalledWith({ reason: "initial" });
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // proactive + lookahead mutual exclusion
+  // -----------------------------------------------------------------------
+
+  describe("proactive + lookahead mutual exclusion", () => {
+    it("proactive first → lookahead does not re-schedule", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+
+      // Only chunk 0 ready first → exits buffering (aheadSec=8 ≥ resumeSec=5)
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Advance time so remaining < PROACTIVE_SCHEDULE_THRESHOLD_SEC (5.0)
+      // chunk 0 output duration ≈ CHUNK0_RAW / 44100 ≈ 8.2s
+      ctx._setCurrentTime(4.0); // elapsed=4, remaining≈4.2 < 5
+
+      // Record createBuffer call count before proactive fires
+      const createBufferMock = ctx.createBuffer as ReturnType<typeof vi.fn>;
+      const callsBefore = createBufferMock.mock.calls.length;
+
+      // chunk 1 ready → onChunkReady → proactive fires (remaining < 5s)
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      const callsAfterProactive = createBufferMock.mock.calls.length;
+      expect(callsAfterProactive).toBe(callsBefore + 1); // one schedule for chunk 1
+
+      // Advance lookahead timer → should NOT create another buffer
+      vi.advanceTimersByTime(200); // LOOKAHEAD_INTERVAL_MS
+      expect(createBufferMock.mock.calls.length).toBe(callsAfterProactive);
+
+      engine.dispose();
+    });
+
+    it("lookahead first → proactive does not re-schedule", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+
+      // chunk 0 and chunk 1 both ready → exit buffering, playing chunk 0
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Advance time so remaining < LOOKAHEAD_THRESHOLD_SEC (3.0)
+      ctx._setCurrentTime(5.5); // elapsed=5.5, remaining≈2.7 < 3
+
+      const createBufferMock = ctx.createBuffer as ReturnType<typeof vi.fn>;
+      const callsBefore = createBufferMock.mock.calls.length;
+
+      // Advance lookahead timer → lookahead fires → schedules chunk 1
+      vi.advanceTimersByTime(200);
+      const callsAfterLookahead = createBufferMock.mock.calls.length;
+      expect(callsAfterLookahead).toBe(callsBefore + 1);
+
+      // chunk 2 ready → onChunkReady fires but chunk 2 != currentChunkIndex+1
+      // and chunk 1 already scheduled → no re-schedule
+      workerStubs.simulateWorkerResult(0, 2, CHUNK2_RAW);
+      expect(createBufferMock.mock.calls.length).toBe(callsAfterLookahead);
+
+      engine.dispose();
+    });
+
+    it("does not schedule when remaining <= 0", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+
+      // chunk 0 ready → exits buffering, playing chunk 0
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      // Advance time past chunk 0's output duration (≈8.2s)
+      ctx._setCurrentTime(9.0); // elapsed=9, remaining≈-0.8 ≤ 0
+
+      const createBufferMock = ctx.createBuffer as ReturnType<typeof vi.fn>;
+      const callsBefore = createBufferMock.mock.calls.length;
+
+      // chunk 1 ready → onChunkReady → proactive check: remaining ≤ 0 → should NOT schedule
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(createBufferMock.mock.calls.length).toBe(callsBefore);
+
+      // Also: lookahead should not schedule when remaining ≤ 0
+      vi.advanceTimersByTime(200);
+      expect(createBufferMock.mock.calls.length).toBe(callsBefore);
 
       engine.dispose();
     });

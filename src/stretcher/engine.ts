@@ -49,7 +49,7 @@ export function trimOverlap(
   }
 
   const ratio = outputLength / inputLength;
-  const crossfadeKeep = Math.round(CROSSFADE_SEC * sampleRate);
+  const crossfadeKeep = Math.round(CROSSFADE_SEC * sampleRate * Math.min(1, ratio));
   const overlapBeforeOutput = Math.round(chunk.overlapBefore * ratio);
   const overlapAfterOutput = Math.round(chunk.overlapAfter * ratio);
   const keepBefore = chunk.overlapBefore > 0 ? Math.min(crossfadeKeep, overlapBeforeOutput) : 0;
@@ -99,6 +99,8 @@ export function createStretcherEngine(
   let bufferingStartTime = 0;
   let currentChunkIndex = 0;
   let bufferingResumePosition: number | null = null;
+  let expectedTransitionFrom: number | null = null;
+  let nextChunkScheduledIndex: number | null = null;
 
   // Memory management window
   const keepAhead = Math.max(KEEP_AHEAD_CHUNKS, Math.ceil(KEEP_AHEAD_SECONDS / CHUNK_DURATION_SEC));
@@ -192,28 +194,36 @@ export function createStretcherEngine(
     advanceToNextChunk();
   });
 
+  function tryScheduleNext(nextIdx: number): void {
+    if (nextChunkScheduledIndex === nextIdx) return;
+    if (nextIdx >= chunks.length) return;
+    const nextChunk = chunks[nextIdx];
+    if (!nextChunk || nextChunk.state !== "ready" || !nextChunk.outputBuffer) return;
+    if (chunkPlayer.hasNextScheduled()) return;
+    const curChunk = chunks[currentChunkIndex];
+    const curOutputDuration = curChunk ? curChunk.outputLength / sampleRate : 0;
+    const elapsed = chunkPlayer.getCurrentPosition();
+    const remaining = curOutputDuration - elapsed;
+    if (remaining <= 0) return;
+    const audioBuffer = createAudioBufferFromChunk(nextChunk);
+    if (!audioBuffer) return;
+    const startTime = ctx.currentTime + remaining;
+    expectedTransitionFrom = currentChunkIndex;
+    chunkPlayer.scheduleNext(audioBuffer, startTime);
+    nextChunkScheduledIndex = nextIdx;
+  }
+
   chunkPlayer.setOnNeedNext(() => {
     if (disposed) return;
-    const nextIdx = currentChunkIndex + 1;
-    if (nextIdx < chunks.length) {
-      const nextChunk = chunks[nextIdx]!;
-      if (nextChunk.state === "ready" && nextChunk.outputBuffer) {
-        const audioBuffer = createAudioBufferFromChunk(nextChunk);
-        if (audioBuffer) {
-          const curChunk = chunks[currentChunkIndex];
-          const curOutputDuration = curChunk ? curChunk.outputLength / sampleRate : 0;
-          const elapsed = chunkPlayer.getCurrentPosition();
-          const remaining = curOutputDuration - elapsed;
-          const startTime = ctx.currentTime + Math.max(0, remaining);
-          chunkPlayer.scheduleNext(audioBuffer, startTime);
-        }
-      }
-    }
+    tryScheduleNext(currentChunkIndex + 1);
   });
 
   chunkPlayer.setOnTransition(() => {
     if (disposed) return;
-    // scheduleNext の transition 完了: chunk N+1 が current に昇格した
+    if (expectedTransitionFrom !== null && currentChunkIndex !== expectedTransitionFrom) {
+      return;
+    }
+    nextChunkScheduledIndex = null;
     const nextIdx = currentChunkIndex + 1;
     if (nextIdx < chunks.length) {
       currentChunkIndex = nextIdx;
@@ -240,22 +250,13 @@ export function createStretcherEngine(
 
     // Proactively schedule next chunk when it becomes ready (background tab resilience)
     if (phase === "playing" && chunkIndex === currentChunkIndex + 1) {
-      if (!chunkPlayer.hasNextScheduled()) {
-        const curChunk = chunks[currentChunkIndex];
-        const curOutputDuration = curChunk ? curChunk.outputLength / sampleRate : 0;
-        const elapsed = chunkPlayer.getCurrentPosition();
-        const remaining = curOutputDuration - elapsed;
+      const curChunk = chunks[currentChunkIndex];
+      const curOutputDuration = curChunk ? curChunk.outputLength / sampleRate : 0;
+      const elapsed = chunkPlayer.getCurrentPosition();
+      const remaining = curOutputDuration - elapsed;
 
-        if (remaining <= PROACTIVE_SCHEDULE_THRESHOLD_SEC) {
-          const nextChunk = chunks[chunkIndex];
-          if (nextChunk?.outputBuffer) {
-            const audioBuffer = createAudioBufferFromChunk(nextChunk);
-            if (audioBuffer) {
-              const startTime = ctx.currentTime + Math.max(0, remaining);
-              chunkPlayer.scheduleNext(audioBuffer, startTime);
-            }
-          }
-        }
+      if (remaining <= PROACTIVE_SCHEDULE_THRESHOLD_SEC) {
+        tryScheduleNext(chunkIndex);
       }
     }
 
@@ -332,6 +333,7 @@ export function createStretcherEngine(
     }
 
     currentChunkIndex = nextIdx;
+    nextChunkScheduledIndex = null;
     scheduler.updatePriorities(currentChunkIndex);
 
     const chunk = chunks[currentChunkIndex];
@@ -353,6 +355,7 @@ export function createStretcherEngine(
     if (phase === "buffering" && reason !== "tempo-change" && reason !== "seek") return;
     phase = "buffering";
     bufferingStartTime = performance.now();
+    nextChunkScheduledIndex = null;
     chunkPlayer.pause();
     emitter.emit("buffering", { reason });
   }
@@ -536,6 +539,7 @@ export function createStretcherEngine(
     const clamped = Math.max(0, Math.min(position, totalDuration));
     const newChunkIdx = getChunkIndexForTime(chunks, clamped, sampleRate);
     currentChunkIndex = newChunkIdx;
+    nextChunkScheduledIndex = null;
 
     scheduler.handleSeek(newChunkIdx);
 
@@ -573,19 +577,37 @@ export function createStretcherEngine(
     isLooping = value;
   }
 
+  let tempoDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
   function setTempo(newTempo: number): void {
     if (disposed || phase === "ended" || newTempo === currentTempo) return;
-    bufferingResumePosition = getPositionInOriginalBuffer();
-    currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition, sampleRate);
+
+    const isFirstInBurst = tempoDebounceTimer === null;
+
+    if (isFirstInBurst) {
+      bufferingResumePosition = getPositionInOriginalBuffer();
+      currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition, sampleRate);
+      enterBuffering("tempo-change");
+    }
+
     currentTempo = newTempo;
-    enterBuffering("tempo-change");
-    scheduler.updatePriorities(currentChunkIndex);
-    scheduler.handleTempoChange(newTempo);
+
+    if (tempoDebounceTimer !== null) clearTimeout(tempoDebounceTimer);
+    tempoDebounceTimer = setTimeout(() => {
+      tempoDebounceTimer = null;
+      if (disposed || phase === "ended") return;
+      scheduler.updatePriorities(currentChunkIndex);
+      scheduler.handleTempoChange(currentTempo);
+    }, 50);
   }
 
   function dispose(): void {
     if (disposed) return;
     disposed = true;
+    if (tempoDebounceTimer !== null) {
+      clearTimeout(tempoDebounceTimer);
+      tempoDebounceTimer = null;
+    }
     chunkPlayer.dispose();
     scheduler.dispose();
     workerManager.terminate();

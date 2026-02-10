@@ -119,6 +119,49 @@ describe("trimOverlap", () => {
     expect(result.length).toBe(3528000 - 83790 - 88200);
   });
 
+  it("trims overlap at high tempo (ratio=0.5, tempo 2.0x)", () => {
+    const inputLen = 352800 + 2 * 8820; // 8sec + overlap
+    const outputLen = Math.round(inputLen * 0.5); // tempo 2.0x → ratio=0.5
+    const data = makeChannels(outputLen);
+    const chunk = makeChunk({
+      inputStartSample: 44100,
+      inputEndSample: 44100 + inputLen,
+      overlapBefore: 8820,
+      overlapAfter: 8820,
+    });
+    const result = trimOverlap(data, outputLen, chunk, SR);
+    // ratio=0.5, crossfadeKeep=round(0.1*44100*0.5)=2205
+    // overlapBeforeOutput=round(8820*0.5)=4410, keepBefore=min(2205,4410)=2205
+    // trimStart=4410-2205=2205
+    // overlapAfterOutput=round(8820*0.5)=4410, trimEnd=4410
+    // newLength=outputLen-2205-4410
+    const expectedLen = outputLen - 2205 - 4410;
+    expect(result.length).toBe(expectedLen);
+    // Ensure trimStart > 0 (the actual bug being fixed)
+    expect(expectedLen).toBeLessThan(outputLen);
+  });
+
+  it("trims overlap at extreme tempo (ratio=0.25, tempo 4.0x)", () => {
+    const inputLen = 352800 + 2 * 8820;
+    const outputLen = Math.round(inputLen * 0.25); // tempo 4.0x → ratio=0.25
+    const data = makeChannels(outputLen);
+    const chunk = makeChunk({
+      inputStartSample: 44100,
+      inputEndSample: 44100 + inputLen,
+      overlapBefore: 8820,
+      overlapAfter: 8820,
+    });
+    const result = trimOverlap(data, outputLen, chunk, SR);
+    // ratio=0.25, crossfadeKeep=round(0.1*44100*0.25)=1103
+    // overlapBeforeOutput=round(8820*0.25)=2205, keepBefore=min(1103,2205)=1103
+    // trimStart=2205-1103=1102
+    // overlapAfterOutput=round(8820*0.25)=2205, trimEnd=2205
+    // newLength=outputLen-1102-2205
+    const expectedLen = outputLen - 1102 - 2205;
+    expect(result.length).toBe(expectedLen);
+    expect(expectedLen).toBeLessThan(outputLen);
+  });
+
   it("handles crossfadeKeep > overlapBeforeOutput (min branch)", () => {
     // overlapBefore=100 samples, ratio=1
     // overlapBeforeOutput=100, crossfadeKeep=4410
