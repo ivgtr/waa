@@ -91,6 +91,10 @@ jobs:
         if: steps.check-label.outputs.release-type != 'none'
         run: npm ci
 
+      - name: Install Playwright browsers
+        if: steps.check-label.outputs.release-type != 'none'
+        run: npx playwright install --with-deps chromium
+
       - name: Typecheck
         if: steps.check-label.outputs.release-type != 'none'
         run: npm run typecheck
