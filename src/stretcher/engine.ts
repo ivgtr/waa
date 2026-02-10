@@ -532,6 +532,24 @@ export function createStretcherEngine(
       return;
     }
 
+    if (bufferingResumePosition !== null) {
+      const resumePos = bufferingResumePosition;
+      bufferingResumePosition = null;
+      const chunk = chunks[currentChunkIndex];
+      if (chunk && chunk.state === "ready" && chunk.outputBuffer) {
+        const nominalStartSample = chunk.inputStartSample + chunk.overlapBefore;
+        const nominalStartSec = nominalStartSample / sampleRate;
+        const offsetInOriginal = resumePos - nominalStartSec;
+        const offsetInOutput = Math.max(0, offsetInOriginal / currentTempo);
+        phase = "playing";
+        playCurrentChunk(getCrossfadeStart(chunk) + offsetInOutput, true);
+      } else {
+        bufferingResumePosition = resumePos;
+        enterBuffering("seek");
+      }
+      return;
+    }
+
     const chunk = chunks[currentChunkIndex];
     if (chunk && chunk.state === "ready") {
       const resumePosition = chunkPlayer.getCurrentPosition();
@@ -570,10 +588,16 @@ export function createStretcherEngine(
           const clampedOffset = Math.min(Math.max(0, bufferOffset), audioBuf.duration - 0.001);
           chunkPlayer.handleSeek(audioBuf, clampedOffset);
         }
+      } else if (phase === "paused") {
+        bufferingResumePosition = clamped;
       }
     } else {
-      bufferingResumePosition = clamped;
-      enterBuffering("seek");
+      if (phase === "paused") {
+        bufferingResumePosition = clamped;
+      } else {
+        bufferingResumePosition = clamped;
+        enterBuffering("seek");
+      }
     }
   }
 
