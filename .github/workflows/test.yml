@@ -1,7 +1,7 @@
 name: Test
 on: [push, pull_request]
 concurrency:
-  group: test-${{ github.ref }}
+  group: test-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 jobs:
   test:
