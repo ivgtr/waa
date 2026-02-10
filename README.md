@@ -1,46 +1,53 @@
 # waa-play
 
 [![npm version](https://img.shields.io/npm/v/waa-play)](https://www.npmjs.com/package/waa-play)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 
-Convenient composable building blocks for Web Audio API.
+Web Audio API modules with WSOLA time-stretching, chunk-based streaming, and waveform extraction
 
-Time-stretch / Streaming / Waveform / BYO AudioContext / Zero Dependencies
+waa-play は Web Audio API を用いた音声操作のためのモジュール群です。ピッチ保持タイムストレッチ、ストリーミング再生、波形抽出、AudioNode チェーン接続などの機能を提供します。
 
-[Documentation & Demo](https://ivgtr.github.io/waa/)
+Web Audio API の `playbackRate` で再生速度を変更するとピッチも連動して変化します。waa-play は、ピッチを保持したまま再生速度を変えたいユースケースのために作成しました。
 
-## Install
+この実装は完璧なものではなく、すべてのユースケースに対応するわけではないことに注意してください。
+
+## Documentation & Demo
+
+https://ivgtr.github.io/waa/
+
+## ピッチ保持タイムストレッチ（WSOLA）
+
+waa-play は WSOLA (Waveform Similarity Overlap-Add) アルゴリズムを採用しています。
+音声信号を小さなフレームに分割し、類似した波形を重ね合わせて再構築することで、ピッチを変えずに時間的な伸縮を実現します。
+
+HTML5 Audio 要素の `preservePitch` オプションと同様の効果を目指していますが、いくつかの制約があります。
+WSOLA の処理はクライアントサイドで行われるため、CPU リソースを多く消費する可能性があります。
+また、AudioBuffer 全体を事前に読み込む必要があるため、長い音声ファイルでは変換に時間がかかる場合があります。
+
+これらの制約に対して、Worker による並列処理やチャンクベースのストリーミングで対処しています。
+
+### Worker ベースの変換
+
+WSOLA 変換は Web Worker 内で実行され、メインスレッドのパフォーマンスへの影響を最小限に抑えています。
+Worker は複数生成され、変換タスクがキューイングされて効率的に処理されます。
+
+### チャンクベースのストリーミング再生
+
+変換済みの音声がチャンク単位で順次再生されます。
+これにより、長時間の音声でもすべての変換を待つことなく、スムーズな再生が可能です。
+
+### イベント通知
+
+再生位置の更新や再生終了などのイベントが通知され、UI の更新や他の処理に利用できます。
+
+## Quick Start
 
 ```bash
 npm install waa-play
 ```
 
-## Features
+### 最も簡単な使い方（WaaPlayer）
 
-### Pitch-preserving time-stretch
-再生速度を変えてもピッチが変わりません。処理は別スレッドで実行されるため、UI をブロックしません。
-
-### Streaming playback
-音声を段階的に処理し、バッファリング状態をイベントで通知します。ローディング UI を簡単に実装できます。
-
-### BYO AudioContext
-既存の AudioContext やオーディオグラフをそのまま使えます。他のライブラリとの統合も容易です。
-
-### Framework integration
-React・Vue・Svelte など、お好みのフレームワークで再生状態をリアクティブに扱えます。
-
-### Waveform extraction
-波形データを取得し、プログレスバーや波形ビジュアライザーを構築できます。
-
-### Background-tab safe
-バックグラウンドタブでも再生位置の追跡が継続します。
-
-## Quick Start
-
-### Class API (WaaPlayer)
-
-最もシンプルな使い方です。`WaaPlayer` が `AudioContext` を内部管理し、全モジュールの機能を統合して提供します。
+`WaaPlayer` が `AudioContext` を内部管理し、全モジュールの機能を統合して提供します。
 
 ```ts
 import { WaaPlayer } from "waa-play";
@@ -49,80 +56,25 @@ const player = new WaaPlayer();
 const buffer = await player.load("/audio/track.mp3");
 
 const gain = player.createGain(0.8);
-const playback = player.play(buffer, { through: [gain] });
+const playback = player.play(buffer, { through: [gain] }); // 再生
 
-player.dispose();
+playback.setPlaybackRate(1.5); // 再生速度を 1.5 倍に変更（リアルタイム反映）
+
+playback.on("timeupdate", ({ position, duration }) => {
+  console.log(`${position.toFixed(2)}s / ${duration.toFixed(2)}s`);
+});
+
+playback.dispose(); // 再生停止・リソース解放
 ```
 
-既存の `AudioContext` を渡すこともできます。
+既存の `AudioContext` を渡すこともできます。これは例えば、他の AudioNode と接続したい場合に有用です。
 
 ```ts
 const player = new WaaPlayer(existingAudioContext);
 ```
 
-### Function API
-
-個別の関数だけ import したい場合はこちら。全関数が `AudioContext` を第一引数に取ります。
-
-```ts
-import { createContext, loadBuffer, play, createGain } from "waa-play";
-
-const ctx = createContext();
-const buffer = await loadBuffer(ctx, "/audio/track.mp3");
-
-const gain = createGain(ctx, 0.8);
-const playback = play(ctx, buffer, { through: [gain] });
-
-playback.on("timeupdate", ({ position, duration }) => {
-  console.log(`${position.toFixed(1)}s / ${duration.toFixed(1)}s`);
-});
-```
-
-## Modules
-
-必要なものだけ個別に import できます。
-
-```ts
-import { play } from "waa-play/play";
-import { loadBuffer } from "waa-play/buffer";
-import { WaaPlayer } from "waa-play/player";
-```
-
-| Module | 概要 |
-|--------|------|
-| `player` | 全モジュールを統合するクラスベース API |
-| `context` | AudioContext のライフサイクル管理 |
-| `buffer` | 音声ファイルのロード・デコード |
-| `play` | 再生制御（play / pause / seek / loop / preservePitch） |
-| `emitter` | 型安全なイベントエミッター |
-| `nodes` | AudioNode のファクトリとチェーン接続 |
-| `waveform` | 波形データの抽出（ピーク・RMS） |
-| `fade` | フェード処理（in / out / crossfade） |
-| `scheduler` | スケジューリングと BPM ベースのクロック |
-| `synth` | 波形バッファの生成（sin / noise / click） |
-| `adapters` | フレームワーク統合（React / Vue / Svelte） |
-| `stretcher` | ピッチ保持タイムストレッチ（WSOLA） |
-
-## API
-
-詳細な使い方・API リファレンスは [Documentation & Demo](https://ivgtr.github.io/waa/) をご覧ください。
-
-### WaaPlayer
-
-| メソッド | 概要 |
-|----------|------|
-| `resume()` / `ensureRunning()` / `now()` | AudioContext 制御 |
-| `load(url)` / `loadFromBlob(blob)` / `loadAll(map)` | 音声ロード |
-| `play(buffer, options?)` | 再生（`Playback` を返す） |
-| `createGain()` / `createFilter()` / `createPanner()` / `createCompressor()` / `createAnalyser()` | ノード生成 |
-| `chain(...nodes)` / `disconnectChain(...nodes)` | グラフ接続 |
-| `fadeIn()` / `fadeOut()` / `crossfade()` / `autoFade()` | フェード |
-| `extractPeaks()` / `extractPeakPairs()` / `extractRMS()` | 波形抽出 |
-| `createScheduler()` / `createClock()` | スケジューリング |
-| `createSineBuffer()` / `createNoiseBuffer()` / `createClickBuffer()` | バッファ合成 |
-| `getSnapshot()` / `subscribeSnapshot()` / `onFrame()` / `whenEnded()` / `whenPosition()` | アダプター |
-| `dispose()` | リソース解放 |
-
 ## License
 
-MIT
+MIT © [ivgtr](https://github.com/ivgtr)
+
+[![Twitter Follow](https://img.shields.io/twitter/follow/ivgtr?style=social)](https://twitter.com/ivgtr) [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
