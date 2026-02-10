@@ -1601,4 +1601,57 @@ describe("engine – advanced paths", () => {
       expect(errorHandler).not.toHaveBeenCalled();
     });
   });
+
+  // -----------------------------------------------------------------------
+  // R-03: start 直後の pause（buffering 完了前）
+  // -----------------------------------------------------------------------
+
+  describe("R-03: start 直後の pause（buffering 完了前）", () => {
+    it("R-03a: start → pause → chunk arrives → resume → playing", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // Pause during initial buffering
+      engine.pause();
+      expect(engine.getStatus().phase).toBe("paused");
+
+      // Chunks arrive during pause — should NOT trigger exitBuffering
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      // Phase should still be paused
+      expect(engine.getStatus().phase).toBe("paused");
+
+      // Resume — chunk is ready, so should play
+      engine.resume();
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.dispose();
+    });
+
+    it("R-03b: start → pause → resume (chunk not ready) → buffering → chunk arrives → playing", () => {
+      const engine = createEngine(ctx, buffer);
+
+      engine.start();
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // Pause during initial buffering (no chunks ready yet)
+      engine.pause();
+      expect(engine.getStatus().phase).toBe("paused");
+
+      // Resume without any chunks ready → enters buffering
+      engine.resume();
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      // Chunks arrive → exitBuffering → playing
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.dispose();
+    });
+  });
 });

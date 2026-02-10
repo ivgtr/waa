@@ -521,4 +521,137 @@ describe("createConversionScheduler – advanced", () => {
     expect(() => scheduler.restorePreviousTempo()).not.toThrow();
     expect(() => scheduler.dispatchNext()).not.toThrow();
   });
+
+  // -----------------------------------------------------------------------
+  // CS-03: seek と setTempo の連続実行
+  // -----------------------------------------------------------------------
+
+  describe("CS-03: seek と setTempo の連続実行", () => {
+    it("CS-03a: handleSeek → handleTempoChange uses seek's currentChunkIdx", () => {
+      const chunks = makeChunks(5);
+      const wm = createMockWorkerManager();
+      const extractData = vi.fn(() => [new Float32Array(1024)]);
+
+      const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
+      scheduler.start(0);
+
+      // Complete all chunks at tempo 1.0
+      const buf = [new Float32Array(1024)];
+      for (let i = 0; i < 5; i++) {
+        wm.simulateResult(i);
+        (scheduler as any)._handleResult(i, buf, 1024);
+      }
+
+      wm.cancelFn.mockClear();
+      wm.posted.length = 0;
+
+      // Seek to index 3 → currentChunkIdx becomes 3
+      scheduler.handleSeek(3);
+
+      // Immediately set tempo to 1.5
+      scheduler.handleTempoChange(1.5);
+
+      // cancelCurrent should have been called by handleTempoChange
+      expect(wm.cancelFn).toHaveBeenCalled();
+
+      // All chunks should be reset (not ready)
+      for (const chunk of chunks) {
+        expect(chunk.state).not.toBe("ready");
+      }
+
+      // First dispatch after tempo change should be chunk 3 (seek position)
+      const tempoPostings = wm.posted.filter((p) => p.tempo === 1.5);
+      expect(tempoPostings.length).toBeGreaterThan(0);
+      expect(tempoPostings[0]!.chunkIndex).toBe(3);
+
+      scheduler.dispose();
+    });
+
+    it("CS-03b: handleTempoChange → handleSeek dispatches from seek target", () => {
+      const chunks = makeChunks(10);
+      const wm = createMockWorkerManager();
+      const extractData = vi.fn(() => [new Float32Array(1024)]);
+
+      const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
+      scheduler.start(0);
+
+      // Complete all chunks at tempo 1.0
+      const buf = [new Float32Array(1024)];
+      for (let i = 0; i < 10; i++) {
+        wm.simulateResult(i);
+        (scheduler as any)._handleResult(i, buf, 1024);
+      }
+
+      // Tempo change resets all chunks, dispatches chunk 0
+      scheduler.handleTempoChange(1.5);
+
+      // Free worker capacity (chunk 0 was dispatched)
+      wm.simulateResult(0);
+      wm.posted.length = 0;
+
+      // Seek to index 3 — re-prioritize around index 3
+      scheduler.handleSeek(3);
+
+      // First dispatch should be chunk 3 (distance 0 from playhead)
+      expect(wm.posted.length).toBeGreaterThan(0);
+      expect(wm.posted[0]!.chunkIndex).toBe(3);
+
+      scheduler.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // CS-05: restorePreviousTempo → handleTempoChange の連鎖
+  // -----------------------------------------------------------------------
+
+  describe("CS-05: restorePreviousTempo → handleTempoChange の連鎖", () => {
+    it("second handleTempoChange caches restored state, second restore works", () => {
+      const chunks = makeChunks(3);
+      const wm = createMockWorkerManager();
+      const extractData = vi.fn(() => [new Float32Array(1024)]);
+
+      const scheduler = createConversionScheduler(chunks, wm, extractData, 44100, 1.0);
+      scheduler.start(0);
+
+      // Complete all chunks at tempo 1.0
+      const buf = [new Float32Array(1024)];
+      for (let i = 0; i < 3; i++) {
+        wm.simulateResult(i);
+        (scheduler as any)._handleResult(i, buf, 1024);
+      }
+
+      // All chunks should be ready
+      expect(chunks.every((c) => c.state === "ready")).toBe(true);
+
+      // 1st tempo change: 1.0 → 1.5 (caches tempo=1.0 buffers)
+      scheduler.handleTempoChange(1.5);
+      expect(chunks.every((c) => c.state !== "ready")).toBe(true);
+
+      // Restore: back to tempo 1.0, chunks restored
+      const restored1 = scheduler.restorePreviousTempo();
+      expect(restored1).toBe(true);
+      for (const chunk of chunks) {
+        expect(chunk.state).toBe("ready");
+        expect(chunk.outputBuffer).not.toBeNull();
+      }
+
+      // 2nd tempo change: 1.0 → 2.0 (caches the restored state)
+      scheduler.handleTempoChange(2.0);
+      expect(chunks.every((c) => c.state !== "ready")).toBe(true);
+
+      // 2nd restore: back to tempo 1.0, chunks restored again
+      const restored2 = scheduler.restorePreviousTempo();
+      expect(restored2).toBe(true);
+      for (const chunk of chunks) {
+        expect(chunk.state).toBe("ready");
+        expect(chunk.outputBuffer).not.toBeNull();
+      }
+
+      // 3rd restore: no cache → returns false
+      const restored3 = scheduler.restorePreviousTempo();
+      expect(restored3).toBe(false);
+
+      scheduler.dispose();
+    });
+  });
 });

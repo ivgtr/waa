@@ -616,4 +616,49 @@ describe("createChunkPlayer – advanced", () => {
       expect(() => player.scheduleNext(buf2, 8)).not.toThrow();
     });
   });
+
+  // -----------------------------------------------------------------------
+  // P-04: crossfade 区間中の getCurrentPosition
+  // -----------------------------------------------------------------------
+
+  describe("P-04: crossfade 区間中の getCurrentPosition", () => {
+    it("returns old source position before doTransition, new source position after", () => {
+      const player = createChunkPlayer(ctx, {
+        destination: ctx.destination,
+        crossfadeSec: 0.1,
+      });
+      const onTransition = vi.fn();
+      player.setOnTransition(onTransition);
+
+      const buf1 = createMockBuffer(8);
+      const buf2 = createMockBuffer(8);
+
+      // Play chunk 1 at t=0 → playStartCtxTime=0, playStartOffset=0
+      player.playChunk(buf1, ctx.currentTime, 0);
+
+      // Advance time
+      ctx._setCurrentTime(7);
+
+      // Schedule next at startTime=8 → nextStartCtxTime = 8 - 0.1 = 7.9
+      player.scheduleNext(buf2, 8);
+
+      // Set time to crossfade midpoint (between 7.9 and 8.0)
+      ctx._setCurrentTime(7.95);
+
+      // Before doTransition: position is based on old source
+      // getCurrentPosition = 7.95 - 0 + 0 = 7.95
+      expect(player.getCurrentPosition()).toBeCloseTo(7.95, 2);
+
+      // Fire transition timer (was scheduled at t=7 with delay 1050ms)
+      vi.advanceTimersByTime(1050);
+
+      // After doTransition: position is based on new source
+      // playStartCtxTime = 7.9, playStartOffset = 0
+      // getCurrentPosition = 7.95 - 7.9 + 0 = 0.05
+      expect(onTransition).toHaveBeenCalledTimes(1);
+      expect(player.getCurrentPosition()).toBeCloseTo(0.05, 2);
+
+      player.dispose();
+    });
+  });
 });

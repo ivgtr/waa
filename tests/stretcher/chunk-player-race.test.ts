@@ -219,4 +219,52 @@ describe("createChunkPlayer – race conditions", () => {
     }
     expect(onChunkEnded).not.toHaveBeenCalled();
   });
+
+  // -----------------------------------------------------------------------
+  // P-03: doTransition 直後の pause
+  // -----------------------------------------------------------------------
+
+  describe("P-03: doTransition 直後の pause", () => {
+    it("pause after doTransition yields correct position from new source", () => {
+      const player = createChunkPlayer(ctx, {
+        destination: ctx.destination,
+        crossfadeSec: 0.1,
+      });
+      const onTransition = vi.fn();
+      player.setOnTransition(onTransition);
+
+      const buf1 = createMockBuffer(8);
+      const buf2 = createMockBuffer(8);
+
+      // Play chunk 1 at t=0 → playStartCtxTime=0, playStartOffset=0
+      player.playChunk(buf1, ctx.currentTime, 0);
+
+      // Advance to near end of chunk 1
+      ctx._setCurrentTime(7);
+
+      // Schedule next chunk at startTime=8 → nextStartCtxTime = 8 - 0.1 = 7.9
+      player.scheduleNext(buf2, 8);
+
+      // calcTransitionDelay(8, 7) = max(0, (8-7)*1000 + 50) = 1050ms
+      // Advance timers to fire the doTransition callback
+      vi.advanceTimersByTime(1050);
+
+      expect(onTransition).toHaveBeenCalledTimes(1);
+
+      // Set time to just after transition point
+      ctx._setCurrentTime(8.0);
+
+      // After doTransition: playStartCtxTime=7.9, playStartOffset=0
+      // getCurrentPosition = 8.0 - 7.9 + 0 = 0.1
+      expect(player.getCurrentPosition()).toBeCloseTo(0.1, 2);
+
+      // Pause immediately after doTransition
+      player.pause();
+
+      // Position should be preserved as pausedPosition
+      expect(player.getCurrentPosition()).toBeCloseTo(0.1, 2);
+
+      player.dispose();
+    });
+  });
 });
