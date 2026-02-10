@@ -400,6 +400,109 @@ describe("engine – advanced paths", () => {
   });
 
   // -----------------------------------------------------------------------
+  // setTempo – during pause
+  // -----------------------------------------------------------------------
+
+  describe("setTempo – during pause", () => {
+    it("does not resume playback when setTempo is called during pause", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+      const bufferingHandler = vi.fn();
+      engine.on("buffering", bufferingHandler);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.pause();
+      expect(engine.getStatus().phase).toBe("paused");
+      bufferingHandler.mockClear();
+
+      engine.setTempo(2.0);
+
+      expect(engine.getStatus().phase).toBe("paused");
+      expect(bufferingHandler).not.toHaveBeenCalled();
+      expect(engine.getStatus().playback.tempo).toBe(2.0);
+
+      engine.dispose();
+    });
+
+    it("resume after pause+setTempo triggers tempo-change buffering", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+      const bufferingHandler = vi.fn();
+      engine.on("buffering", bufferingHandler);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.pause();
+      engine.setTempo(2.0);
+      bufferingHandler.mockClear();
+
+      engine.resume();
+
+      expect(engine.getStatus().phase).toBe("buffering");
+      expect(bufferingHandler).toHaveBeenCalledWith({ reason: "tempo-change" });
+
+      // チャンク変換完了後に再生再開
+      workerStubs.simulateWorkerResult(0, 0, Math.round(CHUNK0_RAW / 2));
+      workerStubs.simulateWorkerResult(1, 1, Math.round(CHUNK1_RAW / 2));
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.dispose();
+    });
+
+    it("multiple setTempo during pause uses final tempo on resume", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+
+      engine.pause();
+      engine.setTempo(1.5);
+      engine.setTempo(2.0);
+      engine.setTempo(2.5);
+
+      expect(engine.getStatus().playback.tempo).toBe(2.5);
+      expect(engine.getStatus().phase).toBe("paused");
+
+      engine.resume();
+      expect(engine.getStatus().phase).toBe("buffering");
+
+      engine.dispose();
+    });
+
+    it("setTempo to same value during pause does not trigger buffering on resume", () => {
+      const engine = createEngine(ctx, buffer, { tempo: 1.0 });
+      const bufferingHandler = vi.fn();
+      engine.on("buffering", bufferingHandler);
+
+      engine.start();
+      workerStubs.simulateWorkerResult(0, 0, CHUNK0_RAW);
+      workerStubs.simulateWorkerResult(1, 1, CHUNK1_RAW);
+      expect(engine.getStatus().phase).toBe("playing");
+
+      engine.pause();
+      bufferingHandler.mockClear();
+
+      engine.setTempo(1.0); // 同じテンポ → early return (newTempo === currentTempo)
+
+      engine.resume();
+      // 通常の resume → playing (buffering ではない)
+      expect(engine.getStatus().phase).toBe("playing");
+      const tempoChanges = bufferingHandler.mock.calls.filter(
+        (call: any) => call[0].reason === "tempo-change",
+      );
+      expect(tempoChanges).toHaveLength(0);
+
+      engine.dispose();
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // getStatus / getSnapshot
   // -----------------------------------------------------------------------
 

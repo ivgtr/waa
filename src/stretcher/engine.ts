@@ -101,6 +101,7 @@ export function createStretcherEngine(
   let bufferingResumePosition: number | null = null;
   let expectedTransitionFrom: number | null = null;
   let nextChunkScheduledIndex: number | null = null;
+  let pendingTempoChange = false;
 
   // Memory management window
   const keepAhead = Math.max(KEEP_AHEAD_CHUNKS, Math.ceil(KEEP_AHEAD_SECONDS / CHUNK_DURATION_SEC));
@@ -522,6 +523,16 @@ export function createStretcherEngine(
   function resume(): void {
     if (disposed || phase !== "paused") return;
 
+    if (pendingTempoChange) {
+      pendingTempoChange = false;
+      bufferingResumePosition = getPositionInOriginalBuffer();
+      currentChunkIndex = getChunkIndexForTime(chunks, bufferingResumePosition, sampleRate);
+      enterBuffering("tempo-change");
+      scheduler.updatePriorities(currentChunkIndex);
+      scheduler.handleTempoChange(currentTempo);
+      return;
+    }
+
     const chunk = chunks[currentChunkIndex];
     if (chunk && chunk.state === "ready") {
       const resumePosition = chunkPlayer.getCurrentPosition();
@@ -581,6 +592,12 @@ export function createStretcherEngine(
 
   function setTempo(newTempo: number): void {
     if (disposed || phase === "ended" || newTempo === currentTempo) return;
+
+    if (phase === "paused") {
+      currentTempo = newTempo;
+      pendingTempoChange = true;
+      return;
+    }
 
     const isFirstInBurst = tempoDebounceTimer === null;
 
